@@ -11,7 +11,7 @@ import com.ospchat.android.data.peers.PeerEntity
 
 @Database(
     entities = [MessageEntity::class, PeerEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class OspChatDatabase : RoomDatabase() {
@@ -68,5 +68,20 @@ internal val MIGRATION_3_4 =
             db.execSQL(
                 "ALTER TABLE `peers` ADD COLUMN `last_read_at` INTEGER NOT NULL DEFAULT 0",
             )
+        }
+    }
+
+/**
+ * v4 → v5: adds five nullable attachment columns to `messages`. All default
+ * to NULL, so existing rows continue to render as plain text messages.
+ */
+internal val MIGRATION_4_5 =
+    object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `messages` ADD COLUMN `attachment_mime` TEXT")
+            db.execSQL("ALTER TABLE `messages` ADD COLUMN `attachment_size_bytes` INTEGER")
+            db.execSQL("ALTER TABLE `messages` ADD COLUMN `attachment_width` INTEGER")
+            db.execSQL("ALTER TABLE `messages` ADD COLUMN `attachment_height` INTEGER")
+            db.execSQL("ALTER TABLE `messages` ADD COLUMN `attachment_local_path` TEXT")
         }
     }

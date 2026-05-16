@@ -1,13 +1,21 @@
 package com.ospchat.android.ui.chat
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -24,6 +32,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,26 +50,37 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import com.ospchat.android.data.messages.Attachment
 import com.ospchat.android.data.messages.Message
 import kotlinx.coroutines.delay
+import java.io.File
 import java.text.DateFormat
 import java.util.Date
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,10 +91,46 @@ fun ChatScreen(
     val peer by viewModel.peer.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val selfUuid by viewModel.selfUuid.collectAsStateWithLifecycle()
+    val draftAttachment by viewModel.draftAttachment.collectAsStateWithLifecycle()
+    val fullscreenPath by viewModel.fullscreenAttachmentPath.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     var showEmojiPicker by remember { mutableStateOf(false) }
     val emojiSheetState = rememberModalBottomSheetState()
+    var showAttachSheet by remember { mutableStateOf(false) }
+    val attachSheetState = rememberModalBottomSheetState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var pendingCaptureUri by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf<Uri?>(null)
+    }
+
+    val takePictureLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.TakePicture(),
+        ) { success ->
+            if (success) pendingCaptureUri?.let { viewModel.attachImage(it) }
+            pendingCaptureUri = null
+        }
+
+    fun launchCamera() {
+        val captureDir = java.io.File(context.cacheDir, "captures").apply { mkdirs() }
+        // Sweep stale captures from previous attempts so cache doesn't grow.
+        captureDir.listFiles()?.forEach { it.delete() }
+        val captureFile = java.io.File(captureDir, "${UUID.randomUUID()}.jpg")
+        val uri =
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                captureFile,
+            )
+        pendingCaptureUri = uri
+        takePictureLauncher.launch(uri)
+    }
     val listState = rememberLazyListState()
+
+    val photoPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+        ) { uri -> viewModel.attachImage(uri) }
 
     // Only auto-scroll if the user is already at (or within one item of) the
     // bottom. This preserves the user's position when they have scrolled up
@@ -164,6 +222,7 @@ fun ChatScreen(
                         message = message,
                         isSelf = selfUuid.isNotEmpty() && message.fromUuid == selfUuid,
                         onRetry = { viewModel.retry(message.id) },
+                        onImageTap = { localPath -> viewModel.openFullscreen(localPath) },
                     )
                 }
             }
@@ -171,7 +230,12 @@ fun ChatScreen(
                 value = draft,
                 onValueChange = { draft = it },
                 onEmojiClick = { showEmojiPicker = true },
-                sendEnabled = peer?.isOnline == true,
+                onAttachClick = { showAttachSheet = true },
+                draftAttachment = draftAttachment,
+                onClearAttachment = { viewModel.attachImage(null) },
+                sendEnabled =
+                    peer?.isOnline == true &&
+                        (draft.trim().isNotEmpty() || draftAttachment != null),
                 onSend = {
                     viewModel.send(draft)
                     draft = ""
@@ -199,6 +263,37 @@ fun ChatScreen(
                 )
             }
         }
+
+        if (showAttachSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showAttachSheet = false },
+                sheetState = attachSheetState,
+            ) {
+                AttachOption(
+                    glyph = "📷",
+                    label = "Camera",
+                    onClick = {
+                        showAttachSheet = false
+                        launchCamera()
+                    },
+                )
+                AttachOption(
+                    glyph = "🖼️",
+                    label = "Gallery",
+                    onClick = {
+                        showAttachSheet = false
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+            }
+        }
+
+        fullscreenPath?.let { path ->
+            FullscreenImageDialog(path = path, onDismiss = { viewModel.closeFullscreen() })
+        }
     }
 }
 
@@ -207,6 +302,7 @@ private fun MessageBubble(
     message: Message,
     isSelf: Boolean,
     onRetry: () -> Unit,
+    onImageTap: (String) -> Unit,
 ) {
     val align = if (isSelf) Alignment.End else Alignment.Start
     val container =
@@ -229,14 +325,24 @@ private fun MessageBubble(
                 .then(if (retryable) Modifier.clickable(onClick = onRetry) else Modifier),
         horizontalAlignment = align,
     ) {
-        Box(
+        Column(
             modifier =
                 Modifier
                     .widthIn(max = 320.dp)
                     .background(container, shape = RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(text = message.body, color = onContainer)
+            message.attachment?.let { attachment ->
+                AttachmentImage(attachment = attachment, onTap = onImageTap)
+            }
+            if (message.body.isNotEmpty()) {
+                Text(
+                    text = message.body,
+                    color = onContainer,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                )
+            }
         }
         Row(
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -251,6 +357,42 @@ private fun MessageBubble(
                 Spacer(modifier = Modifier.size(6.dp))
                 OutboundStatus(status = message.status)
             }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentImage(
+    attachment: Attachment,
+    onTap: (String) -> Unit,
+) {
+    val aspect =
+        if (attachment.width > 0 && attachment.height > 0) {
+            attachment.width.toFloat() / attachment.height.toFloat()
+        } else {
+            1f
+        }
+    val shape = RoundedCornerShape(12.dp)
+    val baseModifier =
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(aspect.coerceIn(0.5f, 2.5f))
+            .clip(shape)
+    if (attachment.localPath != null) {
+        AsyncImage(
+            model = File(attachment.localPath),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = baseModifier.clickable { onTap(attachment.localPath) },
+        )
+    } else {
+        Box(
+            modifier =
+                baseModifier
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
         }
     }
 }
@@ -278,18 +420,16 @@ private fun MessageComposer(
     value: String,
     onValueChange: (String) -> Unit,
     onEmojiClick: () -> Unit,
+    onAttachClick: () -> Unit,
+    draftAttachment: android.net.Uri?,
+    onClearAttachment: () -> Unit,
     sendEnabled: Boolean,
     onSend: () -> Unit,
 ) {
-    val canSend = sendEnabled && value.trim().isNotEmpty()
+    val canSend = sendEnabled
     Column(modifier = Modifier.fillMaxWidth()) {
-        if (!sendEnabled) {
-            Text(
-                text = "Peer is offline — messages can't be sent right now.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
+        if (draftAttachment != null) {
+            DraftAttachmentChip(uri = draftAttachment, onClear = onClearAttachment)
         }
         Row(
             modifier =
@@ -298,6 +438,9 @@ private fun MessageComposer(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            IconButton(onClick = onAttachClick) {
+                Icon(Icons.Filled.Add, contentDescription = "Attach image")
+            }
             IconButton(onClick = onEmojiClick) {
                 Text(text = "😊", style = MaterialTheme.typography.titleLarge)
             }
@@ -317,6 +460,102 @@ private fun MessageComposer(
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
             }
+        }
+    }
+}
+
+@Composable
+private fun DraftAttachmentChip(
+    uri: android.net.Uri,
+    onClear: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = uri,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier =
+                Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+        )
+        Spacer(modifier = Modifier.size(8.dp))
+        Text(
+            text = "Image attached",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onClear) {
+            Icon(Icons.Filled.Close, contentDescription = "Remove attachment")
+        }
+    }
+}
+
+@Composable
+private fun AttachOption(
+    glyph: String,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = glyph, style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.size(16.dp))
+        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun FullscreenImageDialog(
+    path: String,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = true),
+    ) {
+        var scale by remember { mutableFloatStateOf(1f) }
+        var offset by remember { mutableStateOf(Offset.Zero) }
+        val transform =
+            rememberTransformableState { zoomChange, panChange, _ ->
+                scale = (scale * zoomChange).coerceIn(1f, 5f)
+                offset += panChange
+            }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = File(path),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .transformable(state = transform)
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offset.x,
+                            translationY = offset.y,
+                        ),
+            )
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.ospchat.android.net.server
 
+import com.ospchat.android.data.attachments.AttachmentStore
 import com.ospchat.android.data.discovery.DiscoveryRepository
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.messages.MessageRepository
@@ -39,6 +40,7 @@ class MessageServer
         private val discoveryRepository: DiscoveryRepository,
         private val messageRepository: MessageRepository,
         private val messageDao: MessageDao,
+        private val attachmentStore: AttachmentStore,
     ) {
         @Volatile private var engine: ApplicationEngine? = null
 
@@ -80,6 +82,7 @@ class MessageServer
                             discoveryRepository = discoveryRepository,
                             messageRepository = messageRepository,
                             messageDao = messageDao,
+                            attachmentStore = attachmentStore,
                         )
                     }
                 }

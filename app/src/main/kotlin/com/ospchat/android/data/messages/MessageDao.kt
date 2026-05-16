@@ -23,6 +23,12 @@ interface MessageDao {
         status: String,
     )
 
+    @Query("UPDATE messages SET attachment_local_path = :localPath WHERE id = :id")
+    suspend fun updateAttachmentLocalPath(
+        id: String,
+        localPath: String,
+    )
+
     /**
      * Marks our outbound messages to [peerUuid] as READ for everything sent
      * at or before [upToSentAt]. Only DELIVERED messages are upgraded — we

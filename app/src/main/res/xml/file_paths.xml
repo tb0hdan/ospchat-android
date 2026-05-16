@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+        Exposes `cacheDir/captures/` to FileProvider so the system camera app
+        can write captured photos to a path the OSPChat process can read back
+        via the returned content:// URI.
+    -->
+    <cache-path
+        name="captures"
+        path="captures/" />
+</paths>

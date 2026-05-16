@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OSPChat Peer API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     REST API exposed by every OSPChat peer on the local network. Each running
     instance binds an embedded Ktor server to an ephemeral TCP port; that port
@@ -132,6 +132,42 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /v1/attachments/{messageId}:
+    get:
+      tags: [messages]
+      summary: Stream the binary content of a message's attachment.
+      description: |
+        Returns the raw bytes for the attachment previously announced by the
+        sender (the server hosting this endpoint) in `POST /v1/messages`
+        for `messageId`. The Content-Type header carries the original MIME
+        type (e.g. `image/jpeg`).
+
+        The requesting peer is authenticated by source IP: it must match a
+        host advertised by some currently-known peer in the NSD snapshot.
+      operationId: getAttachment
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The attachment binary stream.
+          content:
+            "image/jpeg":
+              schema:
+                type: string
+                format: binary
+            "application/octet-stream":
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 components:
   schemas:
     Info:
@@ -178,6 +214,34 @@ components:
           format: int64
           minimum: 0
           description: Unix epoch milliseconds when the message was authored.
+        attachment:
+          allOf:
+            - $ref: "#/components/schemas/Attachment"
+          nullable: true
+          description: |
+            Optional image attachment. If present, the receiver should fetch
+            the binary via `GET /v1/attachments/{id}` on the sender.
+    Attachment:
+      type: object
+      required: [mimeType, sizeBytes, width, height]
+      properties:
+        mimeType:
+          type: string
+          example: image/jpeg
+          description: MIME type of the attachment binary.
+        sizeBytes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Encoded size in bytes.
+        width:
+          type: integer
+          minimum: 0
+          description: Image width in pixels (used to size placeholders).
+        height:
+          type: integer
+          minimum: 0
+          description: Image height in pixels (used to size placeholders).
     ReadReceipt:
       type: object
       required: [fromUuid, upToSentAt]

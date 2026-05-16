@@ -1,5 +1,6 @@
 package com.ospchat.android.net.server
 
+import com.ospchat.android.data.attachments.AttachmentStore
 import com.ospchat.android.data.discovery.DiscoveryRepository
 import com.ospchat.android.data.discovery.Peer
 import com.ospchat.android.data.messages.MessageDao
@@ -9,23 +10,19 @@ import com.ospchat.android.net.dto.ErrorDto
 import com.ospchat.android.net.dto.IncomingMessageDto
 import com.ospchat.android.net.dto.InfoDto
 import com.ospchat.android.net.dto.ReadReceiptDto
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.Routing
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
-/**
- * Identity captured at server startup. Passed in explicitly rather than read
- * back from `IdentityRepository` inside the handler so that what we serve via
- * `/v1/info` is guaranteed to match what was advertised over NSD when the
- * server started.
- */
 internal data class ServerIdentity(
     val uuid: String,
     val nickname: String,
@@ -36,6 +33,7 @@ internal fun Routing.installMessageRoutes(
     discoveryRepository: DiscoveryRepository,
     messageRepository: MessageRepository,
     messageDao: MessageDao,
+    attachmentStore: AttachmentStore,
 ) {
     route("/v1") {
         get("/info") {
@@ -59,15 +57,30 @@ internal fun Routing.installMessageRoutes(
             messageDao.markOutboundRead(peerUuid = known.uuid, upToSentAt = dto.upToSentAt)
             call.respond(HttpStatusCode.Accepted)
         }
+        get("/attachments/{messageId}") {
+            val messageId =
+                call.parameters["messageId"]
+                    ?: return@get call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorDto(ErrorCodes.BAD_REQUEST, "missing messageId"),
+                    )
+            // Requester must be some currently-known peer on the LAN.
+            call.verifiedRequestingPeerOrRespond(discoveryRepository) ?: return@get
+            val file = attachmentStore.fileFor(messageId)
+            if (!file.isFile) {
+                call.respond(HttpStatusCode.NotFound, ErrorDto(ErrorCodes.UNKNOWN_PEER, "attachment not found"))
+                return@get
+            }
+            val mime =
+                messageDao.findById(messageId)?.attachmentMime
+                    ?: "application/octet-stream"
+            call.respondOutputStream(contentType = ContentType.parse(mime)) {
+                file.inputStream().use { it.copyTo(this) }
+            }
+        }
     }
 }
 
-/**
- * Looks up the peer by [fromUuid] in the live NSD snapshot and verifies the
- * request's source IP matches the peer's advertised host. Responds with the
- * appropriate 4xx and returns `null` if the check fails; returns the [Peer]
- * otherwise.
- */
 private suspend fun ApplicationCall.verifiedPeerOrRespond(
     fromUuid: String,
     discoveryRepository: DiscoveryRepository,
@@ -77,12 +90,28 @@ private suspend fun ApplicationCall.verifiedPeerOrRespond(
         respond(HttpStatusCode.NotFound, ErrorDto(ErrorCodes.UNKNOWN_PEER))
         return null
     }
-    val remoteAddress = request.origin.remoteAddress
-    if (!remoteAddress.matchesPeerHost(known.host)) {
+    if (!request.origin.remoteAddress.matchesPeerHost(known.host)) {
         respond(HttpStatusCode.Unauthorized, ErrorDto(ErrorCodes.ADDRESS_MISMATCH))
         return null
     }
     return known
+}
+
+/**
+ * For endpoints without a body that identifies the caller (like `GET /v1/attachments`),
+ * look up the requester by their source IP against the live NSD snapshot.
+ */
+private suspend fun ApplicationCall.verifiedRequestingPeerOrRespond(discoveryRepository: DiscoveryRepository): Peer? {
+    val remoteAddress = request.origin.remoteAddress
+    val match =
+        discoveryRepository.peerSnapshot.value.values.firstOrNull { peer ->
+            remoteAddress.matchesPeerHost(peer.host)
+        }
+    if (match == null) {
+        respond(HttpStatusCode.Unauthorized, ErrorDto(ErrorCodes.ADDRESS_MISMATCH))
+        return null
+    }
+    return match
 }
 
 internal object ErrorCodes {
@@ -92,12 +121,6 @@ internal object ErrorCodes {
     const val INTERNAL_ERROR = "internal_error"
 }
 
-/**
- * Compare the request's remote address with the host we recorded from NSD.
- * Both are expected to be IP literals (Ktor CIO returns the connecting
- * socket's `InetAddress.hostAddress`; NSD also returns the raw address).
- * IPv6 scope IDs (e.g. `fe80::1%wlan0`) are stripped on either side.
- */
 private fun String.matchesPeerHost(advertised: String): Boolean {
     if (this == advertised) return true
     val a = substringBefore('%')

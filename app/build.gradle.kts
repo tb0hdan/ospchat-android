@@ -85,6 +85,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.emoji2.bundled)
     implementation(libs.androidx.emoji2.emojipicker)
+    implementation(libs.coil.compose)
+    implementation(libs.androidx.exifinterface)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.hilt.android)

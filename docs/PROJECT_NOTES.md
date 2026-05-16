@@ -118,6 +118,31 @@ ospchat-android/
   Ktor server on the port it advertises via NSD; `ChatScreen` lets users
   exchange messages persisted in a Room database. Wire protocol documented
   in `docs/api/openapi.yaml`.
+- 2026-05-16 — v0.1.3: bundled emoji font + emoji picker.
+- 2026-05-16 — v0.1.4: fix for service self-stopping on `PeersScreen`
+  re-entry (peers losing each other after navigating back).
+- 2026-05-16 — v0.1.5: peer persistence by UUID across IP changes; online
+  status dot on the peer list.
+- 2026-05-16 — v0.1.6: outbound message status pipeline
+  (Sending → Delivered → Read, Failed); `POST /v1/read-receipts`;
+  tap-to-retry on failed bubbles.
+- 2026-05-16 — v0.1.7: notifications (channel `ospchat_messages`,
+  suppressed during DND), unread badge on the peer list,
+  `ospchat://chat/{uuid}` deep links.
+- 2026-05-16 — v0.1.8: bottom-tab shell (Contacts / Groups / About).
+  About hosts version, website link, and a nickname-change setting that
+  bounces the discovery service so peers see the new name.
+- 2026-05-16 — **v0.1.9 (released)**: image attachments. Pick from the
+  gallery or take a fresh photo via the system camera (composer `+` →
+  bottom sheet). Compressor reads source EXIF, applies the matching
+  `Matrix` rotation, scales to a 1920 px longest edge, and re-encodes
+  JPEG q85; bytes persist under `filesDir/attachments/`. Two-phase wire
+  protocol: `POST /v1/messages` carries `{mimeType, sizeBytes, width,
+  height}` (post-rotation), `GET /v1/attachments/{messageId}` on the
+  sender streams the binary. Coil-rendered bubbles with pinch-zoom
+  full-screen viewer. Compression now runs on `Dispatchers.IO` inside a
+  `try/catch(Throwable)` so OOM / undecodable URIs surface as
+  `Result.failure` instead of killing the process.
 
 ## Known Limitations
 

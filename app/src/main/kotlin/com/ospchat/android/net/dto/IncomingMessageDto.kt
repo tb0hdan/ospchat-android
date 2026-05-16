@@ -10,6 +10,19 @@ data class IncomingMessageDto(
     val fromNickname: String,
     val body: String,
     val sentAt: Long,
+    val attachment: AttachmentDto? = null,
+)
+
+/**
+ * Metadata for an image attachment. The binary itself is fetched separately
+ * by the receiver via `GET /v1/attachments/{messageId}` on the sender.
+ */
+@Serializable
+data class AttachmentDto(
+    val mimeType: String,
+    val sizeBytes: Long,
+    val width: Int,
+    val height: Int,
 )
 
 /** Wire schema for `POST /v1/read-receipts`. */

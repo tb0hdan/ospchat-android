@@ -9,15 +9,22 @@ data class Message(
     val sentAt: Long,
     val direction: Direction,
     val status: Status,
+    val attachment: Attachment? = null,
 ) {
     enum class Direction { IN, OUT }
 
-    /**
-     * Outbound message lifecycle: [SENDING] → [DELIVERED] → [READ], or
-     * [SENDING] → [FAILED] (terminal until the user retries).
-     *
-     * Inbound messages are always recorded as [DELIVERED] — they only exist
-     * locally if we received and persisted them.
-     */
     enum class Status { SENDING, DELIVERED, READ, FAILED }
 }
+
+/**
+ * Image attachment metadata. [localPath] is null while the bytes are still
+ * being fetched from the remote peer; once non-null, the file is available
+ * under [com.ospchat.android.data.attachments.AttachmentStore].
+ */
+data class Attachment(
+    val mimeType: String,
+    val sizeBytes: Long,
+    val width: Int,
+    val height: Int,
+    val localPath: String?,
+)

@@ -1,5 +1,6 @@
 package com.ospchat.android.ui.chat
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -61,13 +62,34 @@ class ChatViewModel
             }
         }
 
+        private val _draftAttachment = MutableStateFlow<Uri?>(null)
+        val draftAttachment: StateFlow<Uri?> = _draftAttachment.asStateFlow()
+
+        private val _fullscreenAttachmentPath = MutableStateFlow<String?>(null)
+        val fullscreenAttachmentPath: StateFlow<String?> = _fullscreenAttachmentPath.asStateFlow()
+
+        fun attachImage(uri: Uri?) {
+            _draftAttachment.value = uri
+        }
+
+        fun openFullscreen(localPath: String) {
+            _fullscreenAttachmentPath.value = localPath
+        }
+
+        fun closeFullscreen() {
+            _fullscreenAttachmentPath.value = null
+        }
+
         fun send(body: String) {
             val trimmed = body.trim()
-            if (trimmed.isEmpty()) return
+            val attachmentUri = _draftAttachment.value
+            // Allow an attachment-only message (empty text).
+            if (trimmed.isEmpty() && attachmentUri == null) return
             val target = peer.value ?: return
             if (!target.isOnline) return
             viewModelScope.launch {
-                messageRepository.send(target.toPeer(), trimmed)
+                messageRepository.send(target.toPeer(), trimmed, attachmentUri)
+                _draftAttachment.value = null
             }
         }
 

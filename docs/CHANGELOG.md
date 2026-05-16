@@ -4,6 +4,86 @@ All notable changes to OSPChat are recorded here. The format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning.
 
+## [0.1.9] - 2026-05-16
+
+### Added — image attachments
+- Chat composer gained a `+` button that opens a Material 3
+  `ModalBottomSheet` with two options:
+  - **Gallery** — launches the system photo picker
+    (`ActivityResultContracts.PickVisualMedia`, `ImageOnly`). No
+    permission needed on any supported API level.
+  - **Camera** — launches `ActivityResultContracts.TakePicture` against
+    a freshly-allocated `cacheDir/captures/<uuid>.jpg` exposed via a
+    `FileProvider` (`${applicationId}.fileprovider`,
+    `res/xml/file_paths.xml`). No `CAMERA` permission required — we
+    delegate via `Intent`. AndroidManifest gains a `<queries>` block
+    for `MediaStore.ACTION_IMAGE_CAPTURE` (Android 11+ app visibility).
+    Stale captures are swept before each new capture so cache can't
+    grow unbounded.
+- Picked / captured image is shown as a small preview chip above the
+  text field; tap the close icon to discard.
+- On send, `AttachmentCompressor` decodes the URI with a two-pass
+  `BitmapFactory` (sample-size + exact scale), reads
+  `ExifInterface.TAG_ORIENTATION` from the source and applies the
+  matching `Matrix` rotation/flip, then re-encodes JPEG q85. A portrait
+  photo that the camera saved as landscape pixels + `orientation = 6`
+  arrives at the recipient already upright. A 10 MB phone photo
+  becomes ~500 KB. Bytes are persisted to
+  `filesDir/attachments/<messageId>.bin` via the new `AttachmentStore`.
+- `POST /v1/messages` body gains an optional `attachment` object with
+  `{mimeType, sizeBytes, width, height}` — width/height are post-EXIF
+  rotation so the receiver can pre-size its placeholder with the right
+  aspect ratio. The binary itself stays on the sender and is fetched by
+  the receiver via a new `GET /v1/attachments/{messageId}` (streams the
+  file at the recorded MIME; trust-checked by source-IP against the
+  NSD snapshot).
+- On receive, the metadata is persisted and a long-lived background
+  coroutine in `MessageRepository` fires `MessageClient.fetchAttachment`
+  to pull the bytes; the Room row's `attachment_local_path` flips
+  non-null on success, and the bubble swaps from a placeholder spinner
+  to the actual image.
+- Image bubbles render via Coil (`AsyncImage`) at bubble width, using
+  the announced `width:height` ratio for the placeholder so the layout
+  doesn't reflow when the bytes arrive.
+- Tap on an image opens a full-screen `Dialog` with pinch-to-zoom +
+  pan via `rememberTransformableState`. Tap outside the image
+  dismisses.
+- Attachment-only messages (no text body) are allowed.
+
+### Changed
+- Room database bumped to v5. Non-destructive `MIGRATION_4_5` adds five
+  nullable columns to `messages`: `attachment_mime`,
+  `attachment_size_bytes`, `attachment_width`, `attachment_height`,
+  `attachment_local_path`. Pre-existing rows stay as plain-text messages.
+- `OpenAPI` spec bumped to `0.4.0` with the new path, `Attachment`
+  schema, and the optional `attachment` property on `IncomingMessage`.
+- New dependencies: `io.coil-kt:coil-compose:2.7.0` for image rendering,
+  `androidx.exifinterface:exifinterface:1.3.7` for source-side EXIF
+  orientation reads.
+
+### Fixed
+- Image send was broken from the day attachments first shipped during
+  this release cycle: `AttachmentCompressor` did
+  `resolver.openInputStream(uri)?.use { stream ->
+  BitmapFactory.decodeStream(stream, null, dimensionOptions) } ?: error(...)`
+  for the dimensions pass. `decodeStream(..., inJustDecodeBounds = true)`
+  is documented to **always return null** — the dimensions are written
+  to the options' `outWidth` / `outHeight`. So `use { … }` returned
+  null on every successful read and the `?:` fired `error("Could not
+  open attachment URI")` regardless. Now the stream is null-checked
+  separately and the result of the decode is discarded.
+- Sending an image no longer crashes the app even if compression fails.
+  `MessageRepository.send` wraps the attachment block in
+  `withContext(Dispatchers.IO)` inside a `try { … } catch (t: Throwable)`,
+  so OOM from `Bitmap.createScaledBitmap` on huge photos, undecodable
+  URIs, and file-I/O failures are logged and turned into
+  `Result.failure(t)` rather than killing the process from
+  `viewModelScope.launch`'s default dispatcher.
+- `MessageRepository.downloadAttachment` now logs failures via `Log.w`
+  so a peer disappearing mid-download leaves a breadcrumb instead of
+  silently leaving the bubble stuck in the placeholder state.
+- New dependency: `io.coil-kt:coil-compose:2.7.0` (~2 MB).
+
 ## [0.1.8] - 2026-05-16
 
 ### Added — bottom-tab navigation + About / Settings

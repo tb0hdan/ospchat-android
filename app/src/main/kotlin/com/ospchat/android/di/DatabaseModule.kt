@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.ospchat.android.data.db.MIGRATION_1_2
 import com.ospchat.android.data.db.MIGRATION_2_3
 import com.ospchat.android.data.db.MIGRATION_3_4
+import com.ospchat.android.data.db.MIGRATION_4_5
 import com.ospchat.android.data.db.OspChatDatabase
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.peers.PeerDao
@@ -25,7 +26,7 @@ object DatabaseModule {
     ): OspChatDatabase =
         Room
             .databaseBuilder(context, OspChatDatabase::class.java, "ospchat.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
 
     @Provides

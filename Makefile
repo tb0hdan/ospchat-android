@@ -49,6 +49,7 @@ test:
 bundle:
 	$(GRADLE) bundleRelease
 
-# One-time setup if ./gradlew is missing. Requires a system-wide `gradle`.
-wrapper:
-	gradle wrapper --gradle-version 8.10.2
+tag:
+	@echo "Tagging the current version..."
+	git tag -a "v$(VERSION)" -m "Release version $(VERSION)"; \
+	git push origin "v$(VERSION)"
