@@ -14,8 +14,10 @@ semantic versioning.
   90-day retention, downloadable from the run page. Per-ref concurrency
   cancels superseded in-flight runs. Stack: Ubuntu runner, Temurin JDK
   17, `android-actions/setup-android@v3` with `platforms;android-35` +
-  `build-tools;35.0.0`, `gradle/actions/setup-gradle@v4` at Gradle
-  8.10.2, `ktlint` 1.8.0 from the official GitHub release tarball.
+  `build-tools;35.0.0`, Gradle 8.10.2 installed manually from
+  `services.gradle.org` (the `gradle/actions/setup-gradle` action's
+  "Provision Gradle" step collided with the runner's pre-installed
+  `/usr/bin/gradle`), `ktlint` 1.8.0 from the official GitHub release.
 
 ## [0.1.9] - 2026-05-16
 

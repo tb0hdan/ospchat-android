@@ -39,12 +39,19 @@ jobs:
         with:
           packages: 'platforms;android-35 build-tools;35.0.0'
 
-      - name: Set up Gradle 8.10.2
-        # Installs Gradle (so `make wrapper` can run) and wires up the Gradle
-        # build cache for this repo.
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.10.2'
+      - name: Install Gradle 8.10.2
+        # We install Gradle manually rather than via `gradle/actions/setup-gradle`
+        # because that action's "Provision Gradle" step on ubuntu-latest can
+        # collide with the runner's pre-installed `/usr/bin/gradle`. The
+        # Makefile's `make wrapper` target needs a `gradle` on PATH; this
+        # gives it exactly that, at the pinned version, with no surprises.
+        run: |
+          set -euo pipefail
+          curl -sSLo /tmp/gradle.zip \
+            https://services.gradle.org/distributions/gradle-8.10.2-bin.zip
+          sudo unzip -q /tmp/gradle.zip -d /opt
+          echo "/opt/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+          /opt/gradle-8.10.2/bin/gradle --version
 
       - name: Install ktlint 1.8.0
         run: |
@@ -54,15 +61,15 @@ jobs:
           sudo mv /tmp/ktlint /usr/local/bin/ktlint
           ktlint --version
 
-      - name: Generate Gradle wrapper
-        # The wrapper JAR isn't committed; the Makefile's `make build` target
-        # invokes `./gradlew`, so we generate it on demand here.
-        run: make wrapper
-
       - name: Run ktlint
         run: make ktlint
 
       - name: Build debug APK
+        # The Makefile defaults to `./gradlew` (`GRADLE ?= ./gradlew`); we
+        # override it to use the system Gradle installed above so CI doesn't
+        # need to materialise a wrapper jar.
+        env:
+          GRADLE: gradle
         run: make build
 
       - name: Upload debug APK

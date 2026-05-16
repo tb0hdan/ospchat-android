@@ -2,7 +2,7 @@ GRADLE ?= ./gradlew
 VERSION    := $(shell cat VERSION)
 APK_DEBUG  := app/build/outputs/apk/debug/ospchat-$(VERSION)-debug.apk
 
-.PHONY: help build debug clean install lint test bundle wrapper
+.PHONY: help build debug clean install lint gradle-lint ktlint tools ktlint-tool test bundle tag
 
 help:
 	@echo "OSPChat — common tasks"
@@ -10,10 +10,10 @@ help:
 	@echo "  make build     - assemble debug APK"
 	@echo "  make install   - install debug APK on the connected device"
 	@echo "  make clean     - gradle clean"
-	@echo "  make lint      - run Android lint"
+	@echo "  make lint      - run ktlint"
 	@echo "  make test      - run unit tests"
 	@echo "  make bundle    - assemble release AAB"
-	@echo "  make wrapper   - generate the Gradle wrapper (one-time setup)"
+	@echo "  make tag       - tag the current VERSION and push it"
 
 build: debug
 

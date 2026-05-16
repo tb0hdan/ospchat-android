@@ -128,15 +128,18 @@ sdk.dir=/path/to/Android/Sdk
 
 ### One-time Gradle wrapper
 
-The Gradle wrapper JAR is **not committed** to this repo. Generate it once:
+The Gradle wrapper JAR is **not committed** to this repo. Generate it once
+with a system-wide Gradle 8.10.2:
 
 ```bash
 gradle wrapper --gradle-version 8.10.2
-# or simply: make wrapper
 ```
 
-(or just open the project in a recent Android Studio — Sync creates the
+(Or just open the project in a recent Android Studio — Sync creates the
 wrapper for you.) After that, the usual `./gradlew …` commands work.
+
+CI bypasses the wrapper entirely by setting `GRADLE=gradle` against a
+manually-installed Gradle on the runner.
 
 ## Build
 
@@ -150,7 +153,7 @@ wrapper for you.) After that, the usual `./gradlew …` commands work.
 | `make gradle-lint`   | `./gradlew lint` (Android Lint, slower)                                 |
 | `make test`          | `./gradlew test`                                                        |
 | `make bundle`        | `./gradlew bundleRelease` (AAB for Play Store, unsigned)                |
-| `make wrapper`       | generates the Gradle wrapper (one-time)                                 |
+| `make tag`           | `git tag -a v$(VERSION) && git push origin v$(VERSION)`                 |
 | `make tools`         | downloads & installs `ktlint` 1.8.0 into `$GOPATH/bin`                  |
 
 The debug APK lands at:
