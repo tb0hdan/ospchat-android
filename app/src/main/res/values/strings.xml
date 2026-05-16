@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OSPChat</string>
+
+    <string name="nickname_title">Choose a nickname</string>
+    <string name="nickname_hint">Nickname</string>
+    <string name="nickname_explanation">Other peers on your Wi-Fi network will see this name.</string>
+    <string name="nickname_continue">Continue</string>
+
+    <string name="peers_title">Peers on your network</string>
+    <string name="peers_empty">No peers found yet. Open OSPChat on another device on the same Wi-Fi.</string>
+    <string name="peers_self">You</string>
+    <string name="peers_messaging_soon">Messaging is coming in a future release.</string>
+
+    <string name="notification_channel_discovery">Peer discovery</string>
+    <string name="notification_title">OSPChat</string>
+    <string name="notification_text">Looking for nearby peers</string>
+</resources>

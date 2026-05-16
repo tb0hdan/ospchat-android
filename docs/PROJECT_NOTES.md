@@ -1,0 +1,137 @@
+# OSPChat — Project Notes
+
+## Overview
+
+OSPChat is an open-source chat application for Android, written in Kotlin. The
+long-term goal is decentralized peer-to-peer messaging; the v0.1 milestone is
+**LAN peer discovery only** — devices on the same Wi-Fi network see each other
+in a live list. Actual messaging is intentionally deferred.
+
+## Scope of v0.1
+
+In scope:
+
+- Project scaffolding (Gradle, Android manifest, Compose UI shell, Hilt DI).
+- First-run nickname prompt, persisted via DataStore. A stable UUID is also
+  generated under the hood for peer dedup.
+- LAN peer discovery via Android NSD (mDNS/DNS-SD), service type
+  `_ospchat._tcp.`. Each device registers an ephemeral TCP port (placeholder
+  for future messaging) and publishes its UUID via a TXT attribute.
+- A foreground service (`DiscoveryForegroundService`, `connectedDevice` type)
+  that owns the NSD registration + discovery lifecycle so peer state survives
+  brief UI pauses.
+- A `PeersScreen` listing discovered peers with nickname and `host:port`.
+
+Out of scope (deferred):
+
+- Sending/receiving messages over the placeholder TCP socket.
+- Encryption / authenticated handshake.
+- Peer history persistence.
+- Internet / WAN peer discovery.
+
+## Tech Choices
+
+| Decision            | Choice                                           |
+| ------------------- | ------------------------------------------------ |
+| Min SDK             | 26 (Android 8.0)                                 |
+| Target / Compile    | 35 (Android 15)                                  |
+| Language            | Kotlin 2.0.x                                     |
+| UI                  | Jetpack Compose + Material 3                     |
+| Architecture        | MVVM with `ViewModel` + `StateFlow`              |
+| DI                  | Hilt (KSP)                                       |
+| Persistence         | DataStore Preferences (nickname + uuid)          |
+| Peer discovery      | `android.net.nsd.NsdManager` (no extra deps)     |
+| Service type        | `_ospchat._tcp.` with TXT `uuid=<uuid>`          |
+| Background strategy | Foreground service, type `connectedDevice`       |
+| Application ID      | `com.ospchat.android`                            |
+
+## Architecture (v0.1)
+
+```
+            ┌─────────────────────────────────────────────────────┐
+            │                  MainActivity (Compose)             │
+            │                                                     │
+            │   ┌──────────────┐        ┌─────────────────────┐  │
+            │   │NicknameScreen│   or   │   PeersScreen       │  │
+            │   └──────┬───────┘        └──────────┬──────────┘  │
+            └──────────┼───────────────────────────┼─────────────┘
+                       │                           │
+              NicknameViewModel              PeersViewModel
+                       │                           │
+                       ▼                           ▼
+            ┌─────────────────────┐    ┌─────────────────────────┐
+            │ IdentityRepository  │    │ DiscoveryRepository      │
+            │ (DataStore-backed)  │    │   (Hilt @Singleton)      │
+            └─────────────────────┘    │   wraps NsdManager,      │
+                                       │   exposes peers Flow.    │
+                                       └──────────▲───────────────┘
+                                                  │ start/stop
+                                                  │
+                                ┌─────────────────┴─────────────────┐
+                                │ DiscoveryForegroundService         │
+                                │  • acquires MulticastLock          │
+                                │  • posts ongoing notification      │
+                                │  • drives DiscoveryRepository      │
+                                └────────────────────────────────────┘
+```
+
+The foreground service and the `PeersViewModel` inject the **same singleton**
+`DiscoveryRepository`. The service writes; the ViewModel reads. There is no
+cross-process IPC.
+
+## Repository Layout
+
+```
+ospchat-android/
+├── docs/                                  CLAUDE.md-required project docs
+├── gradle/                                Version catalog + wrapper
+│   ├── libs.versions.toml
+│   └── wrapper/gradle-wrapper.properties
+├── app/
+│   └── src/main/
+│       ├── AndroidManifest.xml
+│       ├── kotlin/com/ospchat/android/
+│       │   ├── OSPChatApp.kt              @HiltAndroidApp
+│       │   ├── MainActivity.kt
+│       │   ├── di/AppModule.kt
+│       │   ├── data/
+│       │   │   ├── identity/IdentityRepository.kt
+│       │   │   └── discovery/
+│       │   │       ├── Peer.kt
+│       │   │       ├── NsdPeerDiscovery.kt
+│       │   │       └── DiscoveryRepository.kt
+│       │   ├── service/DiscoveryForegroundService.kt
+│       │   └── ui/
+│       │       ├── theme/{Color,Theme,Type}.kt
+│       │       ├── nickname/...
+│       │       └── peers/...
+│       └── res/...
+├── settings.gradle.kts, build.gradle.kts  Root Gradle (Kotlin DSL)
+├── Makefile, README.md, VERSION, .gitignore
+└── CLAUDE.md, AGENTS.md, GEMINI.md
+```
+
+## Current Status
+
+- 2026-05-16 — Initial scaffold + LAN peer discovery feature created.
+
+## Known Limitations
+
+- The Gradle wrapper JAR is **not** committed; the developer must run
+  `gradle wrapper --gradle-version 8.10.2` once (or open in Android Studio) to
+  generate `gradlew`, `gradlew.bat`, and `gradle/wrapper/gradle-wrapper.jar`.
+  See `README.md`.
+- On API 26–33 some Wi-Fi networks restrict mDNS multicast; the multicast lock
+  acquired by the foreground service is the standard mitigation.
+- Discovery is single-network. Hotspot / dual-Wi-Fi scenarios are untested.
+- No tests yet — adding a unit-test smoke covering `NsdPeerDiscovery` peer
+  bookkeeping is the suggested next step.
+
+## Suggested Next Steps
+
+1. Wire the placeholder `ServerSocket` to actually accept connections and
+   exchange plain-text messages with a tapped peer.
+2. Add an in-memory conversation log per peer + a chat screen.
+3. Persistent message history (Room).
+4. Encrypted handshake (Noise / X3DH-style).
+5. CI: GitHub Actions workflow running `./gradlew assembleDebug lint`.
