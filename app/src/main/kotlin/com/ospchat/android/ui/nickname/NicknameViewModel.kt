@@ -8,16 +8,17 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class NicknameViewModel @Inject constructor(
-    private val identityRepository: IdentityRepository,
-) : ViewModel() {
-
-    fun save(nickname: String) {
-        val trimmed = nickname.trim()
-        if (trimmed.isEmpty()) return
-        viewModelScope.launch {
-            identityRepository.setNickname(trimmed)
-            identityRepository.ensureUuid()
+class NicknameViewModel
+    @Inject
+    constructor(
+        private val identityRepository: IdentityRepository,
+    ) : ViewModel() {
+        fun save(nickname: String) {
+            val trimmed = nickname.trim()
+            if (trimmed.isEmpty()) return
+            viewModelScope.launch {
+                identityRepository.setNickname(trimmed)
+                identityRepository.ensureUuid()
+            }
         }
     }
-}

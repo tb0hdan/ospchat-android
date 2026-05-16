@@ -7,11 +7,12 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-val projectVersion: String = providers
-    .fileContents(rootProject.layout.projectDirectory.file("VERSION"))
-    .asText
-    .get()
-    .trim()
+val projectVersion: String =
+    providers
+        .fileContents(rootProject.layout.projectDirectory.file("VERSION"))
+        .asText
+        .get()
+        .trim()
 
 android {
     namespace = "com.ospchat.android"
@@ -23,6 +24,9 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = projectVersion
+        // Exposes the project version as `R.string.app_version_name` so the
+        // About screen can render it without enabling BuildConfig.
+        resValue("string", "app_version_name", projectVersion)
     }
 
     buildTypes {
@@ -49,18 +53,19 @@ android {
     }
 
     packaging {
-        resources.excludes += listOf(
-            "/META-INF/{AL2.0,LGPL2.1}",
-            "/META-INF/INDEX.LIST",
-            "/META-INF/io.netty.versions.properties",
-        )
+        resources.excludes +=
+            listOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/INDEX.LIST",
+                "/META-INF/io.netty.versions.properties",
+            )
     }
 }
 
 // Match the Makefile's expected output path:
-// app/build/outputs/apk/debug/app-<VERSION>-debug.apk
+// app/build/outputs/apk/debug/ospchat-<VERSION>-debug.apk
 base {
-    archivesName.set("app-$projectVersion")
+    archivesName.set("ospchat-$projectVersion")
 }
 
 dependencies {
@@ -78,6 +83,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.emoji2.bundled)
+    implementation(libs.androidx.emoji2.emojipicker)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.hilt.android)

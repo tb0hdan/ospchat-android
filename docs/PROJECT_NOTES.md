@@ -114,6 +114,10 @@ ospchat-android/
 ## Current Status
 
 - 2026-05-16 — Initial scaffold + LAN peer discovery feature created.
+- 2026-05-16 — v0.2: REST messaging over HTTP. Each peer hosts an embedded
+  Ktor server on the port it advertises via NSD; `ChatScreen` lets users
+  exchange messages persisted in a Room database. Wire protocol documented
+  in `docs/api/openapi.yaml`.
 
 ## Known Limitations
 

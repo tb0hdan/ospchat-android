@@ -17,6 +17,8 @@ room = "2.6.1"
 ktor = "2.3.13"
 kotlinxSerialization = "1.7.3"
 slf4j = "1.7.36"
+emoji2 = "1.5.0"
+emoji2Picker = "1.4.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -54,6 +56,9 @@ ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-conte
 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 slf4j-nop = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
+
+androidx-emoji2-bundled = { group = "androidx.emoji2", name = "emoji2-bundled", version.ref = "emoji2" }
+androidx-emoji2-emojipicker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emoji2Picker" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

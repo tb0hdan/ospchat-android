@@ -1,6 +1,6 @@
 GRADLE ?= ./gradlew
 VERSION    := $(shell cat VERSION)
-APK_DEBUG  := app/build/outputs/apk/debug/app-$(VERSION)-debug.apk
+APK_DEBUG  := app/build/outputs/apk/debug/ospchat-$(VERSION)-debug.apk
 
 .PHONY: help build debug clean install lint test bundle wrapper
 
@@ -30,8 +30,18 @@ install: debug
 	adb install -r $(APK_DEBUG)
 
 
-lint:
+lint: ktlint
+
+gradle-lint:
 	$(GRADLE) lint
+
+ktlint:
+	@ktlint app/
+
+tools: ktlint-tool
+
+ktlint-tool:
+	@curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.8.0/ktlint && chmod a+x ktlint && mv ktlint $(shell go env GOPATH)/bin
 
 test:
 	$(GRADLE) test

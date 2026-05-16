@@ -12,18 +12,23 @@ import javax.inject.Inject
 
 sealed interface IdentityUiState {
     data object Loading : IdentityUiState
+
     data object NeedsNickname : IdentityUiState
-    data class Ready(val nickname: String) : IdentityUiState
+
+    data class Ready(
+        val nickname: String,
+    ) : IdentityUiState
 }
 
 @HiltViewModel
-class AppViewModel @Inject constructor(
-    identityRepository: IdentityRepository,
-) : ViewModel() {
-
-    val uiState: StateFlow<IdentityUiState> = identityRepository.nicknameFlow
-        .map { nick ->
-            if (nick.isNullOrBlank()) IdentityUiState.NeedsNickname else IdentityUiState.Ready(nick)
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IdentityUiState.Loading)
-}
+class AppViewModel
+    @Inject
+    constructor(
+        identityRepository: IdentityRepository,
+    ) : ViewModel() {
+        val uiState: StateFlow<IdentityUiState> =
+            identityRepository.nicknameFlow
+                .map { nick ->
+                    if (nick.isNullOrBlank()) IdentityUiState.NeedsNickname else IdentityUiState.Ready(nick)
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), IdentityUiState.Loading)
+    }

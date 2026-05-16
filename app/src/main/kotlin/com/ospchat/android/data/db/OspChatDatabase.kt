@@ -1,0 +1,72 @@
+package com.ospchat.android.data.db
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.ospchat.android.data.messages.MessageDao
+import com.ospchat.android.data.messages.MessageEntity
+import com.ospchat.android.data.peers.PeerDao
+import com.ospchat.android.data.peers.PeerEntity
+
+@Database(
+    entities = [MessageEntity::class, PeerEntity::class],
+    version = 4,
+    exportSchema = false,
+)
+abstract class OspChatDatabase : RoomDatabase() {
+    abstract fun messageDao(): MessageDao
+
+    abstract fun peerDao(): PeerDao
+}
+
+/**
+ * v1 (messages only) → v2 (adds the `peers` table). No data loss; the
+ * messages table is unchanged.
+ */
+internal val MIGRATION_1_2 =
+    object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `peers` (
+                    `uuid` TEXT NOT NULL,
+                    `nickname` TEXT NOT NULL,
+                    `last_host` TEXT NOT NULL,
+                    `last_port` INTEGER NOT NULL,
+                    `first_seen_at` INTEGER NOT NULL,
+                    `last_seen_at` INTEGER NOT NULL,
+                    PRIMARY KEY(`uuid`)
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
+/**
+ * v2 → v3: adds the `status` column to `messages`. Pre-existing rows have no
+ * known status; we default them to `DELIVERED` (true for inbound, optimistic
+ * for outbound).
+ */
+internal val MIGRATION_2_3 =
+    object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `messages` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'DELIVERED'",
+            )
+        }
+    }
+
+/**
+ * v3 → v4: adds the `last_read_at` column to `peers`. Existing rows default
+ * to `0` (epoch) — every previously-stored inbound message is treated as
+ * unread until the user opens the chat.
+ */
+internal val MIGRATION_3_4 =
+    object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `peers` ADD COLUMN `last_read_at` INTEGER NOT NULL DEFAULT 0",
+            )
+        }
+    }

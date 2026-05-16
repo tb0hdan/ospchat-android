@@ -13,14 +13,15 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+    @Provides
+    @Singleton
+    fun provideNsdManager(
+        @ApplicationContext context: Context,
+    ): NsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
 
     @Provides
     @Singleton
-    fun provideNsdManager(@ApplicationContext context: Context): NsdManager =
-        context.getSystemService(Context.NSD_SERVICE) as NsdManager
-
-    @Provides
-    @Singleton
-    fun provideWifiManager(@ApplicationContext context: Context): WifiManager =
-        context.getSystemService(Context.WIFI_SERVICE) as WifiManager
+    fun provideWifiManager(
+        @ApplicationContext context: Context,
+    ): WifiManager = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
 }

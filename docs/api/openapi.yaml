@@ -1,0 +1,236 @@
+openapi: 3.0.3
+info:
+  title: OSPChat Peer API
+  version: 0.3.0
+  description: |
+    REST API exposed by every OSPChat peer on the local network. Each running
+    instance binds an embedded Ktor server to an ephemeral TCP port; that port
+    is advertised over mDNS / DNS-SD (`_ospchat._tcp.`) together with the
+    peer's stable UUID (TXT attribute `uuid`).
+
+    All endpoints are grouped under `/v1`.
+
+    ## Trust model
+
+    Peers trust each other on first sight (TOFU). Authentication is purely
+    a sanity check:
+      - `POST /v1/messages` requires the body to include a `fromUuid` that
+        the receiver previously discovered via NSD.
+      - The receiver also verifies that the request's source IP matches the
+        host address it learned for that UUID from NSD resolution.
+
+    There is no TLS, no signature, and no replay protection. This API is
+    intended for trusted LAN environments only.
+servers:
+  - url: http://{host}:{port}
+    description: A single peer reachable on the local network.
+    variables:
+      host:
+        default: 192.0.2.10
+        description: The peer's IP on the local network, as resolved via NSD.
+      port:
+        default: "9000"
+        description: |
+          The ephemeral port advertised by the peer via NSD. The default of
+          9000 is illustrative only; the real value is chosen at runtime by
+          the operating system and announced through the `_ospchat._tcp.`
+          DNS-SD record.
+tags:
+  - name: identity
+    description: Endpoints for handshake / probing.
+  - name: messages
+    description: Endpoints for exchanging chat messages.
+paths:
+  /v1/info:
+    get:
+      tags: [identity]
+      summary: Return the peer's identity.
+      description: |
+        Used as a lightweight handshake or liveness probe. Always returns 200
+        with the peer's own UUID, current nickname, and the API version it
+        speaks.
+      operationId: getInfo
+      responses:
+        "200":
+          description: The peer's identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Info"
+              examples:
+                example:
+                  value:
+                    uuid: 7c3e8b1d-4c2f-4ed5-a3b1-5b9f1ed0a51d
+                    nickname: alice
+                    apiVersion: v1
+  /v1/messages:
+    post:
+      tags: [messages]
+      summary: Deliver a single chat message to this peer.
+      description: |
+        Called by another peer when they want to send a message to this one.
+        Bodies are JSON encoded and conform to `IncomingMessage`. The receiver
+        is responsible for de-duplication keyed by `id`.
+      operationId: postMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncomingMessage"
+            examples:
+              example:
+                value:
+                  id: 0d8b8c0c-5d3f-4a3b-b1a4-3a7c6b9f3a02
+                  fromUuid: 7c3e8b1d-4c2f-4ed5-a3b1-5b9f1ed0a51d
+                  fromNickname: alice
+                  body: hello, world
+                  sentAt: 1742140800000
+      responses:
+        "202":
+          description: Message accepted for delivery. The response body is empty.
+          content: {}
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/read-receipts:
+    post:
+      tags: [messages]
+      summary: Mark earlier messages from a peer as read.
+      description: |
+        Sent by a peer (the reader) after they have viewed messages from the
+        recipient of this request (the original sender). The recipient should
+        upgrade their outbound rows to that peer with
+        `sent_at <= upToSentAt` from DELIVERED to READ. The operation is
+        idempotent — replays are safe and have no effect.
+
+        The same trust check applies as for `/v1/messages`: `fromUuid` must
+        match a peer the receiver has discovered via NSD, and the source IP
+        must match that peer's advertised host.
+      operationId: postReadReceipt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReadReceipt"
+            examples:
+              example:
+                value:
+                  fromUuid: 7c3e8b1d-4c2f-4ed5-a3b1-5b9f1ed0a51d
+                  upToSentAt: 1742140800000
+      responses:
+        "202":
+          description: Receipt accepted; matching messages have been marked read.
+          content: {}
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  schemas:
+    Info:
+      type: object
+      required: [uuid, nickname, apiVersion]
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Stable per-install identifier of this peer.
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Display name chosen by the peer's user.
+        apiVersion:
+          type: string
+          enum: [v1]
+          description: API version this peer implements.
+    IncomingMessage:
+      type: object
+      required: [id, fromUuid, fromNickname, body, sentAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Sender-generated unique identifier; used for dedup.
+        fromUuid:
+          type: string
+          format: uuid
+          description: The sender's stable UUID.
+        fromNickname:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: The sender's display name at the time of sending.
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          description: Plain text message body. UTF-8.
+        sentAt:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unix epoch milliseconds when the message was authored.
+    ReadReceipt:
+      type: object
+      required: [fromUuid, upToSentAt]
+      properties:
+        fromUuid:
+          type: string
+          format: uuid
+          description: The reader's stable UUID — i.e. who has read the messages.
+        upToSentAt:
+          type: integer
+          format: int64
+          minimum: 0
+          description: |
+            Unix epoch milliseconds. Only the recipient's `DELIVERED`
+            outbound rows with `sentAt <= upToSentAt` are upgraded to
+            `READ`. Rows still in `SENDING` (in-flight) or `FAILED`
+            (terminal error) are left alone — the reader will need to
+            send a fresh receipt once the message settles.
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          minLength: 1
+          enum:
+            - bad_request
+            - unknown_peer
+            - address_mismatch
+            - internal_error
+          description: |
+            Machine-readable error identifier. Clients may switch on this
+            value to render appropriate UI; it will never contain whitespace.
+        detail:
+          type: string
+          nullable: true
+          description: |
+            Optional free-form context — typically the underlying exception
+            message from the receiving peer. Useful for logs; not intended
+            to drive client logic.
+  responses:
+    Error:
+      description: An error response. The HTTP status code carries the kind.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            unknown_peer:
+              summary: 404 — peer not seen via NSD
+              value:
+                error: unknown_peer
+            address_mismatch:
+              summary: 401 — source IP doesn't match advertised host
+              value:
+                error: address_mismatch

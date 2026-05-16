@@ -6,17 +6,19 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val DarkColors = darkColorScheme(
-    primary = Indigo80,
-    secondary = IndigoGrey80,
-    tertiary = Teal80,
-)
+private val DarkColors =
+    darkColorScheme(
+        primary = Indigo80,
+        secondary = IndigoGrey80,
+        tertiary = Teal80,
+    )
 
-private val LightColors = lightColorScheme(
-    primary = Indigo40,
-    secondary = IndigoGrey40,
-    tertiary = Teal40,
-)
+private val LightColors =
+    lightColorScheme(
+        primary = Indigo40,
+        secondary = IndigoGrey40,
+        tertiary = Teal40,
+    )
 
 @Composable
 fun OspChatTheme(
