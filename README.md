@@ -161,6 +161,18 @@ app/build/outputs/apk/debug/ospchat-<VERSION>-debug.apk
 
 The filename is wired off the `VERSION` file at the project root.
 
+## Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every branch
+push and pull request: it sets up JDK 17, Android SDK 35, Gradle 8.10.2,
+and `ktlint` 1.8.0, then runs `make ktlint` followed by `make build`. Build
+output is discarded with the runner.
+
+When a **tag** is pushed (e.g. `git tag v0.1.10 && git push origin v0.1.10`),
+the same job additionally uploads the generated
+`ospchat-<VERSION>-debug.apk` as a workflow artifact (90-day retention), so
+you can grab it from the run page.
+
 ## First launch
 
 1. Install the APK on **two** devices on the same Wi-Fi.
@@ -278,8 +290,7 @@ Not committed, but the obvious next steps:
 4. Voice notes (audio attachments).
 5. Forwarding messages between peers.
 6. Backup / restore.
-7. CI: a GitHub Actions workflow running `make build` + `make lint`.
-8. Migration tests for the Room schema.
+7. Migration tests for the Room schema.
 
 ## Contributing
 

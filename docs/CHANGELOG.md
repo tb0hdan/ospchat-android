@@ -4,6 +4,19 @@ All notable changes to OSPChat are recorded here. The format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning.
 
+## [Unreleased]
+
+### Added
+- GitHub Actions workflow `.github/workflows/ci.yml`. Every branch push
+  and pull request runs `make ktlint` + `make build` (output discarded
+  with the runner). Tag pushes (`refs/tags/**`) additionally upload the
+  generated `ospchat-<VERSION>-debug.apk` as a workflow artifact with
+  90-day retention, downloadable from the run page. Per-ref concurrency
+  cancels superseded in-flight runs. Stack: Ubuntu runner, Temurin JDK
+  17, `android-actions/setup-android@v3` with `platforms;android-35` +
+  `build-tools;35.0.0`, `gradle/actions/setup-gradle@v4` at Gradle
+  8.10.2, `ktlint` 1.8.0 from the official GitHub release tarball.
+
 ## [0.1.9] - 2026-05-16
 
 ### Added — image attachments

@@ -155,12 +155,16 @@ ospchat-android/
 - Discovery is single-network. Hotspot / dual-Wi-Fi scenarios are untested.
 - No tests yet — adding a unit-test smoke covering `NsdPeerDiscovery` peer
   bookkeeping is the suggested next step.
+- CI (`.github/workflows/ci.yml`) runs `make ktlint` + `make build` on
+  every branch push and PR; tag pushes additionally upload the debug APK
+  as a workflow artifact.
 
 ## Suggested Next Steps
 
-1. Wire the placeholder `ServerSocket` to actually accept connections and
-   exchange plain-text messages with a tapped peer.
-2. Add an in-memory conversation log per peer + a chat screen.
-3. Persistent message history (Room).
-4. Encrypted handshake (Noise / X3DH-style).
-5. CI: GitHub Actions workflow running `./gradlew assembleDebug lint`.
+1. Group chats (multi-peer conversations) — Groups tab is currently a
+   placeholder.
+2. Encrypted handshake (Noise / X3DH-style) so trust isn't pure TOFU.
+3. Message editing / deletion with tombstones (since peers may be
+   offline when an edit is issued).
+4. Migration tests for the Room schema (`MigrationTestHelper`).
+5. Unit-test smoke covering `NsdPeerDiscovery` peer bookkeeping.
