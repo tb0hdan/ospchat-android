@@ -9,15 +9,18 @@ semantic versioning.
 ### Added
 - GitHub Actions workflow `.github/workflows/ci.yml`. Every branch push
   and pull request runs `make ktlint` + `make build` (output discarded
-  with the runner). Tag pushes (`refs/tags/**`) additionally upload the
-  generated `ospchat-<VERSION>-debug.apk` as a workflow artifact with
-  90-day retention, downloadable from the run page. Per-ref concurrency
-  cancels superseded in-flight runs. Stack: Ubuntu runner, Temurin JDK
-  17, `android-actions/setup-android@v3` with `platforms;android-35` +
-  `build-tools;35.0.0`, Gradle 8.10.2 installed manually from
-  `services.gradle.org` (the `gradle/actions/setup-gradle` action's
-  "Provision Gradle" step collided with the runner's pre-installed
-  `/usr/bin/gradle`), `ktlint` 1.8.0 from the official GitHub release.
+  with the runner). Tag pushes (`refs/tags/**`) additionally create a
+  GitHub Release via `softprops/action-gh-release@v2` with the generated
+  `ospchat-<VERSION>-debug.apk` attached as a downloadable asset and
+  auto-generated release notes. Per-ref concurrency cancels superseded
+  in-flight runs. Job permission upgraded to `contents: write` so the
+  release-creation step has the token scope it needs. Stack: Ubuntu
+  runner, Temurin JDK 17, `android-actions/setup-android@v3` with
+  `platforms;android-35` + `build-tools;35.0.0`, Gradle 8.10.2 installed
+  manually from `services.gradle.org` (the `gradle/actions/setup-gradle`
+  action's "Provision Gradle" step collided with the runner's
+  pre-installed `/usr/bin/gradle`), `ktlint` 1.8.0 from the official
+  GitHub release.
 
 ## [0.1.9] - 2026-05-16
 

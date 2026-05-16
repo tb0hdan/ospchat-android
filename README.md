@@ -171,10 +171,11 @@ push and pull request: it sets up JDK 17, Android SDK 35, Gradle 8.10.2,
 and `ktlint` 1.8.0, then runs `make ktlint` followed by `make build`. Build
 output is discarded with the runner.
 
-When a **tag** is pushed (e.g. `git tag v0.1.10 && git push origin v0.1.10`),
-the same job additionally uploads the generated
-`ospchat-<VERSION>-debug.apk` as a workflow artifact (90-day retention), so
-you can grab it from the run page.
+When a **tag** is pushed (e.g. `git tag v0.1.10 && git push origin v0.1.10`,
+or `make tag`), the same job additionally creates a GitHub **Release** on
+the Releases page with the generated `ospchat-<VERSION>-debug.apk`
+attached as a downloadable asset. Release notes are auto-generated from
+the commit log between the previous tag and this one.
 
 ## First launch
 

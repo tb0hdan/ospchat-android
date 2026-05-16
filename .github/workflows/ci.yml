@@ -1,8 +1,8 @@
 name: CI
 
 # Runs on every branch push and PR (verifies ktlint + assembleDebug; build
-# output is discarded). When a tag is pushed, additionally uploads the debug
-# APK as a workflow artifact so it can be downloaded from the run page.
+# output is discarded). When a tag is pushed, additionally creates a GitHub
+# Release with the debug APK attached as a release asset.
 on:
   push:
     branches: ['**']
@@ -11,7 +11,9 @@ on:
     branches: ['**']
 
 permissions:
-  contents: read
+  # `contents: write` is needed for the release-creation step on tag pushes;
+  # the verify-only branch / PR builds don't exercise it.
+  contents: write
 
 # Cancel previous in-flight runs for the same branch / PR so a quick succession
 # of pushes doesn't queue redundant builds.
@@ -72,13 +74,13 @@ jobs:
           GRADLE: gradle
         run: make build
 
-      - name: Upload debug APK
-        # Only retained when this run is for a tag push. On branch pushes and
-        # PRs the build artifacts are discarded when the runner is torn down.
+      - name: Create GitHub Release
+        # Tag pushes only — branch / PR runs discard build output as before.
+        # The action creates a Release named after the tag and attaches every
+        # APK matching the glob below.
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v4
+        uses: softprops/action-gh-release@v2
         with:
-          name: ospchat-debug-${{ github.ref_name }}
-          path: app/build/outputs/apk/debug/ospchat-*-debug.apk
-          if-no-files-found: error
-          retention-days: 90
+          files: app/build/outputs/apk/debug/ospchat-*-debug.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true
