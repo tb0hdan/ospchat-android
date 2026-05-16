@@ -132,6 +132,15 @@ ospchat-android/
 - 2026-05-16 — v0.1.8: bottom-tab shell (Contacts / Groups / About).
   About hosts version, website link, and a nickname-change setting that
   bounces the discovery service so peers see the new name.
+- 2026-05-16 — **unreleased**: user avatars. Initials avatar
+  (deterministic colored circle, two-letter nickname-derived label;
+  regenerates on rename) and a custom-avatar pickable from About >
+  Settings. Avatars rendered on the left of each Contacts row and next
+  to the chat top-bar title. Wire: `Info.avatarHash` + new
+  `GET /v1/avatar`; receivers cache and refresh on hash change.
+  `PeerAvatarSync` runs on every "new peer in NSD snapshot" transition
+  in `DiscoveryForegroundService.peerSyncJob`. Room v6 adds
+  `peers.avatar_hash` + `avatar_local_path`. OpenAPI 0.5.0.
 - 2026-05-16 — **v0.1.9 (released)**: image attachments. Pick from the
   gallery or take a fresh photo via the system camera (composer `+` →
   bottom sheet). Compressor reads source EXIF, applies the matching

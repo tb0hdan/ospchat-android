@@ -1,10 +1,13 @@
 package com.ospchat.android.net.server
 
 import com.ospchat.android.data.attachments.AttachmentStore
+import com.ospchat.android.data.avatar.AvatarStore
 import com.ospchat.android.data.discovery.DiscoveryRepository
 import com.ospchat.android.data.discovery.Peer
+import com.ospchat.android.data.identity.IdentityRepository
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.messages.MessageRepository
+import com.ospchat.android.data.peers.PeerAvatarSync
 import com.ospchat.android.net.ApiVersion
 import com.ospchat.android.net.dto.ErrorDto
 import com.ospchat.android.net.dto.IncomingMessageDto
@@ -34,14 +37,22 @@ internal fun Routing.installMessageRoutes(
     messageRepository: MessageRepository,
     messageDao: MessageDao,
     attachmentStore: AttachmentStore,
+    avatarStore: AvatarStore,
+    identityRepository: IdentityRepository,
+    peerAvatarSync: PeerAvatarSync,
 ) {
     route("/v1") {
         get("/info") {
+            // Read the avatar hash dynamically: the user can change their
+            // avatar without the service restarting, and `/v1/info` should
+            // reflect the latest value so peers can re-sync.
+            val avatarHash = identityRepository.currentAvatarHash()
             call.respond(
                 InfoDto(
                     uuid = identity.uuid,
                     nickname = identity.nickname,
                     apiVersion = ApiVersion.V1,
+                    avatarHash = avatarHash,
                 ),
             )
         }
@@ -64,7 +75,6 @@ internal fun Routing.installMessageRoutes(
                         HttpStatusCode.BadRequest,
                         ErrorDto(ErrorCodes.BAD_REQUEST, "missing messageId"),
                     )
-            // Requester must be some currently-known peer on the LAN.
             call.verifiedRequestingPeerOrRespond(discoveryRepository) ?: return@get
             val file = attachmentStore.fileFor(messageId)
             if (!file.isFile) {
@@ -75,6 +85,30 @@ internal fun Routing.installMessageRoutes(
                 messageDao.findById(messageId)?.attachmentMime
                     ?: "application/octet-stream"
             call.respondOutputStream(contentType = ContentType.parse(mime)) {
+                file.inputStream().use { it.copyTo(this) }
+            }
+        }
+        post("/notify-refresh") {
+            // Empty-body POST; caller identified by source IP. Schedules a
+            // background sync against the sending peer so the response goes
+            // straight back without waiting for the HTTP round-trips.
+            val peer = call.verifiedRequestingPeerOrRespond(discoveryRepository) ?: return@post
+            peerAvatarSync.triggerSync(peer)
+            call.respond(HttpStatusCode.Accepted)
+        }
+        get("/avatar") {
+            call.verifiedRequestingPeerOrRespond(discoveryRepository) ?: return@get
+            val currentHash = identityRepository.currentAvatarHash()
+            if (currentHash == null) {
+                call.respond(HttpStatusCode.NotFound, ErrorDto(ErrorCodes.UNKNOWN_PEER, "no custom avatar"))
+                return@get
+            }
+            val file = avatarStore.selfFile(currentHash)
+            if (!file.isFile) {
+                call.respond(HttpStatusCode.NotFound, ErrorDto(ErrorCodes.UNKNOWN_PEER, "no custom avatar"))
+                return@get
+            }
+            call.respondOutputStream(contentType = ContentType.Image.JPEG) {
                 file.inputStream().use { it.copyTo(this) }
             }
         }

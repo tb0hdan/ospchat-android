@@ -11,7 +11,7 @@ import com.ospchat.android.data.peers.PeerEntity
 
 @Database(
     entities = [MessageEntity::class, PeerEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class OspChatDatabase : RoomDatabase() {
@@ -83,5 +83,18 @@ internal val MIGRATION_4_5 =
             db.execSQL("ALTER TABLE `messages` ADD COLUMN `attachment_width` INTEGER")
             db.execSQL("ALTER TABLE `messages` ADD COLUMN `attachment_height` INTEGER")
             db.execSQL("ALTER TABLE `messages` ADD COLUMN `attachment_local_path` TEXT")
+        }
+    }
+
+/**
+ * v5 → v6: adds two nullable avatar columns to `peers`. NULL on both means
+ * the peer hasn't set a custom avatar; the UI falls back to nickname
+ * initials in that case.
+ */
+internal val MIGRATION_5_6 =
+    object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `peers` ADD COLUMN `avatar_hash` TEXT")
+            db.execSQL("ALTER TABLE `peers` ADD COLUMN `avatar_local_path` TEXT")
         }
     }

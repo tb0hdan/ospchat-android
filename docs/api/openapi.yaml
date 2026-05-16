@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OSPChat Peer API
-  version: 0.4.0
+  version: 0.6.0
   description: |
     REST API exposed by every OSPChat peer on the local network. Each running
     instance binds an embedded Ktor server to an ephemeral TCP port; that port
@@ -63,6 +63,55 @@ paths:
                     uuid: 7c3e8b1d-4c2f-4ed5-a3b1-5b9f1ed0a51d
                     nickname: alice
                     apiVersion: v1
+  /v1/notify-refresh:
+    post:
+      tags: [identity]
+      summary: Tell this peer that the sender's `/v1/info` has changed.
+      description: |
+        Empty-body POST. The receiver should re-pull `/v1/info` from the
+        requesting peer (identified by source IP against the live NSD
+        snapshot) to pick up nickname / avatar changes. Used by the
+        sender immediately after they update their avatar so peers don't
+        have to wait for an NSD-level lost+found cycle.
+
+        Authenticated by source IP only — no body needed. The handler
+        kicks off the sync on a background coroutine and returns 202 to
+        keep the round-trip short.
+      operationId: postNotifyRefresh
+      responses:
+        "202":
+          description: Refresh accepted; the receiver will pull /v1/info shortly.
+          content: {}
+        "401":
+          $ref: "#/components/responses/Error"
+  /v1/avatar:
+    get:
+      tags: [identity]
+      summary: Stream this peer's custom avatar (JPEG bytes).
+      description: |
+        Returns the raw JPEG bytes for the peer's user-set avatar. The
+        `avatarHash` field of `GET /v1/info` carries the SHA-256 hex of the
+        same bytes, so receivers fetch this endpoint only when their cached
+        hash differs.
+
+        Responds 404 when the peer has no custom avatar set (the requester
+        should render nickname initials instead).
+
+        Authenticated by source IP against the live NSD snapshot, identical
+        to `GET /v1/attachments/{messageId}`.
+      operationId: getAvatar
+      responses:
+        "200":
+          description: The avatar JPEG bytes.
+          content:
+            "image/jpeg":
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/messages:
     post:
       tags: [messages]
@@ -187,6 +236,14 @@ components:
           type: string
           enum: [v1]
           description: API version this peer implements.
+        avatarHash:
+          type: string
+          nullable: true
+          pattern: "^[0-9a-f]{64}$"
+          description: |
+            SHA-256 hex of the peer's custom avatar JPEG, or `null` when no
+            custom avatar is set. Receivers re-fetch `GET /v1/avatar` when
+            this value changes from what they have cached.
     IncomingMessage:
       type: object
       required: [id, fromUuid, fromNickname, body, sentAt]

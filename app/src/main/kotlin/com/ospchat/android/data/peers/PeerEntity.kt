@@ -10,6 +10,9 @@ import androidx.room.PrimaryKey
  *
  * [lastReadAt] is the high-water mark of inbound messages the local user has
  * acknowledged from this peer; anything newer counts as unread.
+ *
+ * [avatarHash] / [avatarLocalPath] track the peer's custom avatar (when they
+ * have one). `null` for both means we render initials for that peer.
  */
 @Entity(tableName = "peers")
 data class PeerEntity(
@@ -20,4 +23,6 @@ data class PeerEntity(
     @ColumnInfo(name = "first_seen_at") val firstSeenAt: Long,
     @ColumnInfo(name = "last_seen_at") val lastSeenAt: Long,
     @ColumnInfo(name = "last_read_at") val lastReadAt: Long = 0L,
+    @ColumnInfo(name = "avatar_hash") val avatarHash: String? = null,
+    @ColumnInfo(name = "avatar_local_path") val avatarLocalPath: String? = null,
 )

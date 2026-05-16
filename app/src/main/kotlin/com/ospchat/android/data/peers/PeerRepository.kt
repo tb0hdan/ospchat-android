@@ -65,6 +65,9 @@ class PeerRepository
                     lastSeenAt = now,
                     // Preserve the user's read mark across re-discovery upserts.
                     lastReadAt = existing?.lastReadAt ?: 0L,
+                    // Preserve any cached avatar — PeerAvatarSync owns these.
+                    avatarHash = existing?.avatarHash,
+                    avatarLocalPath = existing?.avatarLocalPath,
                 ),
             )
         }
@@ -93,5 +96,6 @@ class PeerRepository
                 isOnline = live != null,
                 lastSeenAt = lastSeenAt,
                 unreadCount = unreadCount,
+                avatarLocalPath = avatarLocalPath,
             )
     }

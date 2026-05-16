@@ -1,9 +1,12 @@
 package com.ospchat.android.net.server
 
 import com.ospchat.android.data.attachments.AttachmentStore
+import com.ospchat.android.data.avatar.AvatarStore
 import com.ospchat.android.data.discovery.DiscoveryRepository
+import com.ospchat.android.data.identity.IdentityRepository
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.messages.MessageRepository
+import com.ospchat.android.data.peers.PeerAvatarSync
 import com.ospchat.android.net.dto.ErrorDto
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -41,6 +44,9 @@ class MessageServer
         private val messageRepository: MessageRepository,
         private val messageDao: MessageDao,
         private val attachmentStore: AttachmentStore,
+        private val avatarStore: AvatarStore,
+        private val identityRepository: IdentityRepository,
+        private val peerAvatarSync: PeerAvatarSync,
     ) {
         @Volatile private var engine: ApplicationEngine? = null
 
@@ -83,6 +89,9 @@ class MessageServer
                             messageRepository = messageRepository,
                             messageDao = messageDao,
                             attachmentStore = attachmentStore,
+                            avatarStore = avatarStore,
+                            identityRepository = identityRepository,
+                            peerAvatarSync = peerAvatarSync,
                         )
                     }
                 }

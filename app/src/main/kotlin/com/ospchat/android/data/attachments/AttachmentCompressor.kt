@@ -12,9 +12,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Down-scales an arbitrary user-picked image to at most [MAX_EDGE] pixels on
- * its longest edge, applies the EXIF orientation as a real pixel rotation,
- * and re-encodes the result as JPEG at [JPEG_QUALITY].
+ * Down-scales an arbitrary user-picked image to at most `maxEdge` pixels on
+ * its longest edge (default [DEFAULT_MAX_EDGE]; avatars pass a smaller value),
+ * applies the EXIF orientation as a real pixel rotation, and re-encodes the
+ * result as JPEG at [JPEG_QUALITY].
  *
  * Baking the rotation into the pixels means the produced JPEG is visually
  * upright and contains no EXIF (Bitmap.compress doesn't preserve EXIF
@@ -36,7 +37,10 @@ class AttachmentCompressor
             val mimeType: String,
         )
 
-        fun compress(uri: Uri): Result {
+        fun compress(
+            uri: Uri,
+            maxEdge: Int = DEFAULT_MAX_EDGE,
+        ): Result {
             val resolver = context.contentResolver
 
             // Read EXIF orientation up front. The source URI might be a
@@ -67,7 +71,7 @@ class AttachmentCompressor
             val sourceHeight = dimensionOptions.outHeight
             if (sourceWidth <= 0 || sourceHeight <= 0) error("Picked URI is not a decodable image")
 
-            val sampleSize = computeSampleSize(sourceWidth, sourceHeight)
+            val sampleSize = computeSampleSize(sourceWidth, sourceHeight, maxEdge)
 
             // Second pass: decode at the sampled resolution.
             val decodeOptions =
@@ -80,8 +84,8 @@ class AttachmentCompressor
                     BitmapFactory.decodeStream(stream, null, decodeOptions)
                 } ?: error("Could not decode attachment URI")
 
-            // Exact scale to fit MAX_EDGE on the longest edge.
-            val scaled = scaleToFit(sampledBitmap)
+            // Exact scale to fit `maxEdge` on the longest edge.
+            val scaled = scaleToFit(sampledBitmap, maxEdge)
             if (scaled !== sampledBitmap) sampledBitmap.recycle()
 
             // Apply the EXIF rotation as a pixel transform. After this, the
@@ -107,11 +111,12 @@ class AttachmentCompressor
         private fun computeSampleSize(
             srcW: Int,
             srcH: Int,
+            maxEdge: Int,
         ): Int {
             var sample = 1
             var w = srcW
             var h = srcH
-            while (w / 2 >= MAX_EDGE || h / 2 >= MAX_EDGE) {
+            while (w / 2 >= maxEdge || h / 2 >= maxEdge) {
                 w /= 2
                 h /= 2
                 sample *= 2
@@ -119,10 +124,13 @@ class AttachmentCompressor
             return sample
         }
 
-        private fun scaleToFit(bitmap: Bitmap): Bitmap {
+        private fun scaleToFit(
+            bitmap: Bitmap,
+            maxEdge: Int,
+        ): Bitmap {
             val longest = maxOf(bitmap.width, bitmap.height)
-            if (longest <= MAX_EDGE) return bitmap
-            val ratio = MAX_EDGE.toFloat() / longest
+            if (longest <= maxEdge) return bitmap
+            val ratio = maxEdge.toFloat() / longest
             val newW = (bitmap.width * ratio).toInt().coerceAtLeast(1)
             val newH = (bitmap.height * ratio).toInt().coerceAtLeast(1)
             return Bitmap.createScaledBitmap(bitmap, newW, newH, true)
@@ -185,7 +193,7 @@ class AttachmentCompressor
         }
 
         private companion object {
-            const val MAX_EDGE = 1920
+            const val DEFAULT_MAX_EDGE = 1920
             const val JPEG_QUALITY = 85
         }
     }

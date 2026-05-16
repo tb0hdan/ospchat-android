@@ -46,6 +46,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ospchat.android.R
 import com.ospchat.android.data.peers.PeerRecord
 import com.ospchat.android.service.DiscoveryForegroundService
+import com.ospchat.android.ui.avatar.Avatar
+import com.ospchat.android.ui.avatar.AvatarModel
+import com.ospchat.android.ui.avatar.computeInitials
 
 @Composable
 fun PeersScreen(
@@ -135,6 +138,8 @@ private fun PeerRow(
                     .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Avatar(model = peer.toAvatarModel(), size = 44.dp)
+            Spacer(modifier = Modifier.size(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = peer.nickname,
@@ -173,6 +178,13 @@ private fun UnreadIndicator(count: Int) {
         Badge { Text(count.toString()) }
     }
 }
+
+private fun PeerRecord.toAvatarModel(): AvatarModel =
+    if (avatarLocalPath != null) {
+        AvatarModel.Custom(avatarLocalPath)
+    } else {
+        AvatarModel.Initials(letters = computeInitials(nickname), seed = uuid)
+    }
 
 @Composable
 private fun StatusDot(isOnline: Boolean) {

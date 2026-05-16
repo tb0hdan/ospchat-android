@@ -19,6 +19,9 @@
     <string name="about_version_label">Version %1$s</string>
     <string name="about_settings_header">Settings</string>
     <string name="about_nickname_save">Save</string>
+    <string name="about_avatar_header">Avatar</string>
+    <string name="about_avatar_change">Change image</string>
+    <string name="about_avatar_reset">Reset to initials</string>
 
     <string name="notification_channel_discovery">Peer discovery</string>
     <string name="notification_title">OSPChat</string>

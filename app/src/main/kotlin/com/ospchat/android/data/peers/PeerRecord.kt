@@ -14,6 +14,7 @@ data class PeerRecord(
     val isOnline: Boolean,
     val lastSeenAt: Long,
     val unreadCount: Int,
+    val avatarLocalPath: String?,
 ) {
     fun toPeer(): Peer = Peer(uuid = uuid, nickname = nickname, host = host, port = port)
 }

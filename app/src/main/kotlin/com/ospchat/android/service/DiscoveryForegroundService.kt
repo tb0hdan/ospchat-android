@@ -15,6 +15,7 @@ import androidx.core.app.ServiceCompat
 import com.ospchat.android.R
 import com.ospchat.android.data.discovery.DiscoveryRepository
 import com.ospchat.android.data.identity.IdentityRepository
+import com.ospchat.android.data.peers.PeerAvatarSync
 import com.ospchat.android.data.peers.PeerRepository
 import com.ospchat.android.net.server.MessageServer
 import dagger.hilt.android.AndroidEntryPoint
@@ -49,6 +50,8 @@ class DiscoveryForegroundService : Service() {
     @Inject lateinit var discoveryRepository: DiscoveryRepository
 
     @Inject lateinit var peerRepository: PeerRepository
+
+    @Inject lateinit var peerAvatarSync: PeerAvatarSync
 
     @Inject lateinit var messageServer: MessageServer
 
@@ -102,10 +105,22 @@ class DiscoveryForegroundService : Service() {
                     fullyStarted = true
                     peerSyncJob =
                         scope.launch {
+                            var previous = emptySet<String>()
                             discoveryRepository.peerSnapshot.collect { snapshot ->
                                 snapshot.values.forEach { peer ->
                                     peerRepository.recordSeen(peer)
                                 }
+                                // Fire an info+avatar sync for any peer that
+                                // was absent from the previous snapshot (first
+                                // discovery, or re-discovery after they
+                                // restarted their service to pick up a name /
+                                // avatar change).
+                                val current = snapshot.keys
+                                (current - previous).forEach { uuid ->
+                                    val peer = snapshot[uuid] ?: return@forEach
+                                    launch { peerAvatarSync.sync(peer) }
+                                }
+                                previous = current
                             }
                         }
                 } catch (ce: CancellationException) {

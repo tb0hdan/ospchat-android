@@ -76,6 +76,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.ospchat.android.data.messages.Attachment
 import com.ospchat.android.data.messages.Message
+import com.ospchat.android.data.peers.PeerRecord
+import com.ospchat.android.ui.avatar.Avatar
+import com.ospchat.android.ui.avatar.AvatarModel
+import com.ospchat.android.ui.avatar.computeInitials
 import kotlinx.coroutines.delay
 import java.io.File
 import java.text.DateFormat
@@ -189,7 +193,15 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(peer?.nickname ?: "Chat") },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        peer?.let {
+                            Avatar(model = it.toAvatarModel(), size = 32.dp)
+                            Spacer(modifier = Modifier.size(10.dp))
+                        }
+                        Text(peer?.nickname ?: "Chat")
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -572,3 +584,10 @@ private fun StatusDot(isOnline: Boolean) {
                 .background(color),
     )
 }
+
+private fun PeerRecord.toAvatarModel(): AvatarModel =
+    if (avatarLocalPath != null) {
+        AvatarModel.Custom(avatarLocalPath)
+    } else {
+        AvatarModel.Initials(letters = computeInitials(nickname), seed = uuid)
+    }

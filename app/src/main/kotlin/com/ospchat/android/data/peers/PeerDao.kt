@@ -22,4 +22,13 @@ interface PeerDao {
         uuid: String,
         lastReadAt: Long,
     )
+
+    @Query(
+        "UPDATE peers SET avatar_hash = :hash, avatar_local_path = :localPath WHERE uuid = :uuid",
+    )
+    suspend fun updateAvatar(
+        uuid: String,
+        hash: String?,
+        localPath: String?,
+    )
 }

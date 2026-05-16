@@ -4,9 +4,87 @@ All notable changes to OSPChat are recorded here. The format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning.
 
-## [Unreleased]
+## [0.1.12] - 2026-05-16
 
-### Added
+### Changed — avatar propagation no longer bounces the service
+- Avatar swaps now propagate via a new `POST /v1/notify-refresh` push
+  notification instead of bouncing the discovery foreground service.
+  `AvatarRepository` (after writing the new self file + persisting the
+  hash) calls `PeerInfoNotifier.broadcastRefresh()`, which fires a
+  fire-and-forget POST to every currently-known peer. Each peer's route
+  handler verifies the requester by source IP and calls
+  `PeerAvatarSync.triggerSync(senderPeer)` to schedule the local
+  `GET /v1/info` + `GET /v1/avatar` round-trip on a long-lived IO scope.
+  The HTTP response goes back as `202 Accepted` immediately. This avoids
+  the multicast-lock release that comes with a service bounce — which
+  on some Wi-Fi networks (and especially when AP isolation is *not* the
+  problem) was leaving the radio in a degraded state for 10+ seconds
+  after the bounce. Nickname changes still bounce because the new name
+  has to land in NSD's TXT record. OpenAPI bumped to **0.6.0**.
+
+### Fixed — avatar propagation
+- Avatar changes now actually propagate to other peers. Two problems
+  combined into the bug report ("settings dialog correctly displays
+  newly selected avatar, but it doesn't propagate to the other phone"):
+  - `PeerAvatarSync` fired exactly once when a peer transitioned from
+    absent to present in the NSD snapshot, but the moment immediately
+    after a service bounce had the TCP layer in a flaky state — logs
+    showed `ConnectTimeoutException` on one side and
+    `NoRouteToHostException` on the other right after the new NSD
+    advertisement. The sync gave up. It now retries up to four times
+    with `0 / 500 ms / 2 s / 5 s` backoff, which clears the transient
+    failures.
+  - Cached avatar files lived at a stable path (`peer-<uuid>.jpg`,
+    `self.jpg`). Coil keys its in-memory cache on the file path, so
+    overwriting the same path with new bytes left the old bitmap on
+    screen until the process restarted. Filenames now embed the
+    SHA-256 hash (`peer-<uuid>-<hash>.jpg`, `self-<hash>.jpg`); a
+    content change therefore becomes a path change, the `PeerRecord`
+    Flow re-emits with a new `avatarLocalPath`, and `AsyncImage`
+    reloads. Old hash-files are cleaned up via
+    `AvatarStore.cleanupSelfExcept` / `cleanupPeerExcept`.
+
+## [0.1.11] - 2026-05-16
+
+### Added — user avatars
+- Every user now has an avatar. When no custom image is set, the UI
+  renders a colored circle with the first two letters of their nickname
+  (deterministic per-UUID hue, fixed saturation/lightness; white text).
+  The initials regenerate when the nickname changes.
+- New **Avatar** subsection in About > Settings: shows the current
+  avatar at 96 dp; **Change image** opens the system photo picker
+  (gallery only); **Reset to initials** drops back to the colored
+  circle.
+- A 44 dp avatar now sits on the left of each peer row in the Contacts
+  tab; a 32 dp avatar appears next to the nickname in the chat top bar.
+- Avatars are shared across peers. `GET /v1/info` carries an optional
+  `avatarHash` (SHA-256 hex of the JPEG bytes, or `null` for initials);
+  a new `GET /v1/avatar` streams the binary. Receivers cache by hash and
+  re-pull only on change.
+- Custom-avatar pipeline reuses `AttachmentCompressor` with `maxEdge =
+  256` so the JPEG stays small (~10–30 KB) and EXIF rotation is applied
+  before encoding. Bytes land at `filesDir/avatar/self.jpg`; SHA-256 is
+  persisted via DataStore for fast `/v1/info` responses.
+- New Room schema v6 with `MIGRATION_5_6` adding nullable `avatar_hash`
+  + `avatar_local_path` columns to `peers`. Existing rows render as
+  initials until the peer announces a custom avatar.
+- New `PeerAvatarSync` (Hilt singleton): given a `Peer`, fetches
+  `/v1/info`, diffs the hash, pulls fresh avatar bytes via
+  `MessageClient.fetchAvatar`, persists. Triggered by
+  `DiscoveryForegroundService.peerSyncJob` for each peer that transitions
+  from absent to present in the NSD snapshot — covers first discovery
+  and re-discovery after a peer restarts their service (which is how
+  nickname / avatar changes propagate).
+- Saving a custom avatar bounces the discovery service the same way
+  saving a nickname does, so peers immediately see us drop+rejoin and
+  fetch the new hash without needing a push channel. (Superseded in
+  **0.1.12** by the `POST /v1/notify-refresh` push path.)
+- OpenAPI spec bumped to **0.5.0** with the new `/v1/avatar` GET path
+  and the optional `Info.avatarHash` field (SHA-256 hex regex pattern).
+
+## [0.1.10] - 2026-05-16
+
+### Added — continuous integration
 - GitHub Actions workflow `.github/workflows/ci.yml`. Every branch push
   and pull request runs `make ktlint` + `make build` (output discarded
   with the runner). Tag pushes (`refs/tags/**`) additionally create a

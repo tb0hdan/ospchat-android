@@ -26,6 +26,15 @@ class IdentityRepository
 
         val nicknameFlow: Flow<String?> = store.data.map { it[NICKNAME_KEY] }
 
+        val uuidFlow: Flow<String?> = store.data.map { it[UUID_KEY] }
+
+        /**
+         * SHA-256 hex of the currently-set custom avatar JPEG. `null` means
+         * the user has no custom avatar; the UI falls back to nickname
+         * initials. Peers consult this via `GET /v1/info`.
+         */
+        val avatarHashFlow: Flow<String?> = store.data.map { it[AVATAR_HASH_KEY] }
+
         suspend fun setNickname(nickname: String) {
             val trimmed = nickname.trim()
             require(trimmed.isNotEmpty()) { "Nickname must not be blank" }
@@ -50,8 +59,21 @@ class IdentityRepository
             return winner
         }
 
+        suspend fun currentAvatarHash(): String? = store.data.first()[AVATAR_HASH_KEY]
+
+        suspend fun setAvatarHash(hash: String?) {
+            store.edit { prefs ->
+                if (hash == null) {
+                    prefs.remove(AVATAR_HASH_KEY)
+                } else {
+                    prefs[AVATAR_HASH_KEY] = hash
+                }
+            }
+        }
+
         private companion object {
             val NICKNAME_KEY = stringPreferencesKey("nickname")
             val UUID_KEY = stringPreferencesKey("uuid")
+            val AVATAR_HASH_KEY = stringPreferencesKey("avatar_hash")
         }
     }
