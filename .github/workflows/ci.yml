@@ -1,0 +1,77 @@
+name: CI
+
+# Runs on every branch push and PR (verifies ktlint + assembleDebug; build
+# output is discarded). When a tag is pushed, additionally uploads the debug
+# APK as a workflow artifact so it can be downloaded from the run page.
+on:
+  push:
+    branches: ['**']
+    tags: ['**']
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+# Cancel previous in-flight runs for the same branch / PR so a quick succession
+# of pushes doesn't queue redundant builds.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ktlint + assembleDebug
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle 8.10.2
+        # Installs Gradle (so `make wrapper` can run) and wires up the Gradle
+        # build cache for this repo.
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Install ktlint 1.8.0
+        run: |
+          curl -sSLo /tmp/ktlint \
+            https://github.com/pinterest/ktlint/releases/download/1.8.0/ktlint
+          chmod +x /tmp/ktlint
+          sudo mv /tmp/ktlint /usr/local/bin/ktlint
+          ktlint --version
+
+      - name: Generate Gradle wrapper
+        # The wrapper JAR isn't committed; the Makefile's `make build` target
+        # invokes `./gradlew`, so we generate it on demand here.
+        run: make wrapper
+
+      - name: Run ktlint
+        run: make ktlint
+
+      - name: Build debug APK
+        run: make build
+
+      - name: Upload debug APK
+        # Only retained when this run is for a tag push. On branch pushes and
+        # PRs the build artifacts are discarded when the runner is torn down.
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ospchat-debug-${{ github.ref_name }}
+          path: app/build/outputs/apk/debug/ospchat-*-debug.apk
+          if-no-files-found: error
+          retention-days: 90

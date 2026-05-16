@@ -301,5 +301,6 @@ Commits should not include co-author lines.
 
 ## License
 
-TBD (the project is currently unlicensed — please check before
-redistributing). Project home: <https://ospchat.com>.
+[BSD 3-Clause License](LICENSE). © 2026 Bohdan Turkynevych.
+
+Project home: <https://ospchat.com>.
