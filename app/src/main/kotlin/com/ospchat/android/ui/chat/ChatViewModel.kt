@@ -9,6 +9,8 @@ import com.ospchat.android.data.messages.Message
 import com.ospchat.android.data.messages.MessageRepository
 import com.ospchat.android.data.peers.PeerRecord
 import com.ospchat.android.data.peers.PeerRepository
+import com.ospchat.android.data.reactions.Reaction
+import com.ospchat.android.data.reactions.ReactionRepository
 import com.ospchat.android.notifications.ActiveChatTracker
 import com.ospchat.android.notifications.MessageNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,6 +31,7 @@ class ChatViewModel
         private val messageRepository: MessageRepository,
         private val identityRepository: IdentityRepository,
         private val peerRepository: PeerRepository,
+        private val reactionRepository: ReactionRepository,
         private val activeChatTracker: ActiveChatTracker,
         private val notifier: MessageNotifier,
     ) : ViewModel() {
@@ -45,6 +49,13 @@ class ChatViewModel
             messageRepository
                 .messagesFor(peerUuid)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        /** All reactions on every message in this conversation, grouped by message id. */
+        val reactionsByMessage: StateFlow<Map<String, List<Reaction>>> =
+            reactionRepository
+                .reactionsForPeer(peerUuid)
+                .map { reactions -> reactions.groupBy { it.messageId } }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
         private val _selfUuid = MutableStateFlow("")
 
@@ -90,6 +101,33 @@ class ChatViewModel
             viewModelScope.launch {
                 messageRepository.send(target.toPeer(), trimmed, attachmentUri)
                 _draftAttachment.value = null
+            }
+        }
+
+        /**
+         * Set or clear the local user's reaction on [messageId]. `null`
+         * removes the reaction; a non-null emoji upserts (replacing any
+         * previous reaction from the same user on the same message).
+         */
+        fun react(
+            messageId: String,
+            emoji: String?,
+        ) {
+            val target = peer.value
+            android.util.Log.d(
+                "ChatViewModel",
+                "react(messageId=$messageId, emoji=$emoji) peer=${target?.uuid} isOnline=${target?.isOnline}",
+            )
+            if (target == null) {
+                android.util.Log.w("ChatViewModel", "react: peer.value is null; dropping")
+                return
+            }
+            viewModelScope.launch {
+                val result = reactionRepository.react(target.toPeer(), messageId, emoji)
+                android.util.Log.d(
+                    "ChatViewModel",
+                    "react result for $messageId: success=${result.isSuccess} err=${result.exceptionOrNull()?.message}",
+                )
             }
         }
 

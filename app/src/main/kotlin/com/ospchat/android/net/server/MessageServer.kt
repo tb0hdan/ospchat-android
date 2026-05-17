@@ -7,6 +7,7 @@ import com.ospchat.android.data.identity.IdentityRepository
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.messages.MessageRepository
 import com.ospchat.android.data.peers.PeerAvatarSync
+import com.ospchat.android.data.reactions.ReactionRepository
 import com.ospchat.android.net.dto.ErrorDto
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -47,6 +48,7 @@ class MessageServer
         private val avatarStore: AvatarStore,
         private val identityRepository: IdentityRepository,
         private val peerAvatarSync: PeerAvatarSync,
+        private val reactionRepository: ReactionRepository,
     ) {
         @Volatile private var engine: ApplicationEngine? = null
 
@@ -92,6 +94,7 @@ class MessageServer
                             avatarStore = avatarStore,
                             identityRepository = identityRepository,
                             peerAvatarSync = peerAvatarSync,
+                            reactionRepository = reactionRepository,
                         )
                     }
                 }

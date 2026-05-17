@@ -7,9 +7,11 @@ import com.ospchat.android.data.db.MIGRATION_2_3
 import com.ospchat.android.data.db.MIGRATION_3_4
 import com.ospchat.android.data.db.MIGRATION_4_5
 import com.ospchat.android.data.db.MIGRATION_5_6
+import com.ospchat.android.data.db.MIGRATION_6_7
 import com.ospchat.android.data.db.OspChatDatabase
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.peers.PeerDao
+import com.ospchat.android.data.reactions.ReactionDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,6 +35,7 @@ object DatabaseModule {
                 MIGRATION_3_4,
                 MIGRATION_4_5,
                 MIGRATION_5_6,
+                MIGRATION_6_7,
             ).build()
 
     @Provides
@@ -42,4 +45,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun providePeerDao(database: OspChatDatabase): PeerDao = database.peerDao()
+
+    @Provides
+    @Singleton
+    fun provideReactionDao(database: OspChatDatabase): ReactionDao = database.reactionDao()
 }

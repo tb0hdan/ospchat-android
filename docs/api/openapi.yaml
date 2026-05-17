@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OSPChat Peer API
-  version: 0.6.0
+  version: 0.7.0
   description: |
     REST API exposed by every OSPChat peer on the local network. Each running
     instance binds an embedded Ktor server to an ephemeral TCP port; that port
@@ -63,6 +63,56 @@ paths:
                     uuid: 7c3e8b1d-4c2f-4ed5-a3b1-5b9f1ed0a51d
                     nickname: alice
                     apiVersion: v1
+  /v1/reactions:
+    post:
+      tags: [messages]
+      summary: Add, replace, or remove a reaction on a message.
+      description: |
+        Each user can have at most **one** reaction per message: a fresh
+        `ReactionDto` from the same `fromUuid` on the same `messageId`
+        replaces the previous one.
+
+        When `emoji` is `null`, the receiver should delete the row for
+        `(messageId, fromUuid)` entirely — this is how a user clears
+        their reaction.
+
+        Authenticated by `fromUuid` against the live NSD snapshot, with
+        the request's source IP matching that peer's advertised host
+        (identical to `POST /v1/messages`).
+      operationId: postReaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reaction"
+            examples:
+              add:
+                summary: Adding 😀 to a message
+                value:
+                  messageId: 0d8b8c0c-5d3f-4a3b-b1a4-3a7c6b9f3a02
+                  fromUuid: 7c3e8b1d-4c2f-4ed5-a3b1-5b9f1ed0a51d
+                  fromNickname: alice
+                  emoji: 😀
+                  reactedAt: 1742140800000
+              remove:
+                summary: Removing a previously-placed reaction
+                value:
+                  messageId: 0d8b8c0c-5d3f-4a3b-b1a4-3a7c6b9f3a02
+                  fromUuid: 7c3e8b1d-4c2f-4ed5-a3b1-5b9f1ed0a51d
+                  fromNickname: alice
+                  emoji: null
+                  reactedAt: 1742140905000
+      responses:
+        "202":
+          description: Reaction accepted.
+          content: {}
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/notify-refresh:
     post:
       tags: [identity]
@@ -299,6 +349,36 @@ components:
           type: integer
           minimum: 0
           description: Image height in pixels (used to size placeholders).
+    Reaction:
+      type: object
+      required: [messageId, fromUuid, fromNickname, reactedAt]
+      properties:
+        messageId:
+          type: string
+          format: uuid
+          description: The message this reaction is attached to.
+        fromUuid:
+          type: string
+          format: uuid
+          description: UUID of the peer placing (or removing) the reaction.
+        fromNickname:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Sender's display name at the time of reacting.
+        emoji:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 16
+          description: |
+            The emoji glyph. `null` means *remove* the sender's current
+            reaction on the message, regardless of which emoji it was.
+        reactedAt:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unix epoch milliseconds when the reaction was placed.
     ReadReceipt:
       type: object
       required: [fromUuid, upToSentAt]

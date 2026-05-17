@@ -3,6 +3,7 @@ package com.ospchat.android.net.client
 import com.ospchat.android.data.discovery.Peer
 import com.ospchat.android.net.dto.IncomingMessageDto
 import com.ospchat.android.net.dto.InfoDto
+import com.ospchat.android.net.dto.ReactionDto
 import com.ospchat.android.net.dto.ReadReceiptDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -42,6 +43,13 @@ class MessageClient
             body: ReadReceiptDto,
         ) {
             postJson(peer, "/v1/read-receipts", body)
+        }
+
+        suspend fun sendReaction(
+            peer: Peer,
+            body: ReactionDto,
+        ) {
+            postJson(peer, "/v1/reactions", body)
         }
 
         /**

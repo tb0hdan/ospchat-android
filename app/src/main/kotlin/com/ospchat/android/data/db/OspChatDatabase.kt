@@ -8,16 +8,20 @@ import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.messages.MessageEntity
 import com.ospchat.android.data.peers.PeerDao
 import com.ospchat.android.data.peers.PeerEntity
+import com.ospchat.android.data.reactions.ReactionDao
+import com.ospchat.android.data.reactions.ReactionEntity
 
 @Database(
-    entities = [MessageEntity::class, PeerEntity::class],
-    version = 6,
+    entities = [MessageEntity::class, PeerEntity::class, ReactionEntity::class],
+    version = 7,
     exportSchema = false,
 )
 abstract class OspChatDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
 
     abstract fun peerDao(): PeerDao
+
+    abstract fun reactionDao(): ReactionDao
 }
 
 /**
@@ -96,5 +100,28 @@ internal val MIGRATION_5_6 =
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("ALTER TABLE `peers` ADD COLUMN `avatar_hash` TEXT")
             db.execSQL("ALTER TABLE `peers` ADD COLUMN `avatar_local_path` TEXT")
+        }
+    }
+
+/**
+ * v6 → v7: adds the `reactions` table. Composite PK on
+ * `(message_id, from_uuid)` enforces the one-reaction-per-user-per-message
+ * rule (a fresh reaction REPLACES the previous one).
+ */
+internal val MIGRATION_6_7 =
+    object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `reactions` (
+                    `message_id` TEXT NOT NULL,
+                    `from_uuid` TEXT NOT NULL,
+                    `from_nickname` TEXT NOT NULL,
+                    `emoji` TEXT NOT NULL,
+                    `reacted_at` INTEGER NOT NULL,
+                    PRIMARY KEY(`message_id`, `from_uuid`)
+                )
+                """.trimIndent(),
+            )
         }
     }

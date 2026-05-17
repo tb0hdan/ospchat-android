@@ -8,10 +8,12 @@ import com.ospchat.android.data.identity.IdentityRepository
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.messages.MessageRepository
 import com.ospchat.android.data.peers.PeerAvatarSync
+import com.ospchat.android.data.reactions.ReactionRepository
 import com.ospchat.android.net.ApiVersion
 import com.ospchat.android.net.dto.ErrorDto
 import com.ospchat.android.net.dto.IncomingMessageDto
 import com.ospchat.android.net.dto.InfoDto
+import com.ospchat.android.net.dto.ReactionDto
 import com.ospchat.android.net.dto.ReadReceiptDto
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -40,6 +42,7 @@ internal fun Routing.installMessageRoutes(
     avatarStore: AvatarStore,
     identityRepository: IdentityRepository,
     peerAvatarSync: PeerAvatarSync,
+    reactionRepository: ReactionRepository,
 ) {
     route("/v1") {
         get("/info") {
@@ -66,6 +69,12 @@ internal fun Routing.installMessageRoutes(
             val dto = call.receive<ReadReceiptDto>()
             val known = call.verifiedPeerOrRespond(dto.fromUuid, discoveryRepository) ?: return@post
             messageDao.markOutboundRead(peerUuid = known.uuid, upToSentAt = dto.upToSentAt)
+            call.respond(HttpStatusCode.Accepted)
+        }
+        post("/reactions") {
+            val dto = call.receive<ReactionDto>()
+            call.verifiedPeerOrRespond(dto.fromUuid, discoveryRepository) ?: return@post
+            reactionRepository.applyReaction(dto)
             call.respond(HttpStatusCode.Accepted)
         }
         get("/attachments/{messageId}") {

@@ -4,6 +4,42 @@ All notable changes to OSPChat are recorded here. The format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 semantic versioning.
 
+## [Unreleased]
+
+### Added — message reactions
+- Long-pressing a chat bubble (own or peer) opens an emoji picker
+  bottom sheet (reusing the AndroidX `EmojiPickerView` we already host
+  for the composer). The selected emoji becomes the local user's
+  reaction on that message — at most **one reaction per user per
+  message**; picking a different emoji replaces the previous one.
+- Reactions render as small rounded chips **inside the bubble** —
+  directly under the message body — so the bubble itself grows to
+  contain them. Chip layout uses Compose `FlowRow`; each chip shows the
+  emoji and, when there are multiple reactors, a count. To keep chips
+  legible against either bubble tint, chips that *I* contribute to use
+  the tertiary-container tint, the rest use a neutral surface tone
+  contrasted against the bubble's own colour.
+- Tapping a chip toggles: if my current reaction matches the chip's
+  emoji, the chip-tap *removes* my reaction; otherwise it upserts mine
+  to the chip's emoji.
+- New Room schema **v7** with non-destructive `MIGRATION_6_7` creating
+  a `reactions` table. Composite primary key `(message_id, from_uuid)`
+  enforces the one-per-user-per-message rule via Room's
+  `OnConflictStrategy.REPLACE`.
+- New `Reaction` domain class, `ReactionEntity`, `ReactionDao`
+  (`observeForPeer` joins reactions with messages so the Flow is
+  conversation-scoped), and `ReactionRepository` (`react` + local
+  upsert/delete + wire send; `applyReaction` for inbound).
+- New wire endpoint `POST /v1/reactions` carrying `ReactionDto`
+  (`messageId, fromUuid, fromNickname, emoji: String?, reactedAt`).
+  `emoji == null` means *remove this user's reaction*; otherwise it's
+  an upsert. Same trust check as `POST /v1/messages` (UUID known via
+  NSD + source IP matches advertised host).
+- `MessageClient.sendReaction`, `ReactionRepository`, and a `ChatViewModel`
+  `react(messageId, emoji?)` complete the local pipeline.
+- OpenAPI bumped to **0.7.0** with the new path, `Reaction` schema,
+  and add/remove examples.
+
 ## [0.1.12] - 2026-05-16
 
 ### Changed — avatar propagation no longer bounces the service

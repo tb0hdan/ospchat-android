@@ -4,14 +4,18 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,14 +42,17 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -77,6 +84,7 @@ import coil.compose.AsyncImage
 import com.ospchat.android.data.messages.Attachment
 import com.ospchat.android.data.messages.Message
 import com.ospchat.android.data.peers.PeerRecord
+import com.ospchat.android.data.reactions.Reaction
 import com.ospchat.android.ui.avatar.Avatar
 import com.ospchat.android.ui.avatar.AvatarModel
 import com.ospchat.android.ui.avatar.computeInitials
@@ -94,7 +102,10 @@ fun ChatScreen(
 ) {
     val peer by viewModel.peer.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
+    val reactionsByMessage by viewModel.reactionsByMessage.collectAsStateWithLifecycle()
     val selfUuid by viewModel.selfUuid.collectAsStateWithLifecycle()
+    var reactingToMessage by remember { mutableStateOf<Message?>(null) }
+    val reactionSheetState = rememberModalBottomSheetState()
     val draftAttachment by viewModel.draftAttachment.collectAsStateWithLifecycle()
     val fullscreenPath by viewModel.fullscreenAttachmentPath.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
@@ -230,11 +241,22 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 items(messages, key = { it.id }) { message ->
+                    val reactions = reactionsByMessage[message.id].orEmpty()
                     MessageBubble(
                         message = message,
                         isSelf = selfUuid.isNotEmpty() && message.fromUuid == selfUuid,
+                        reactions = reactions,
+                        selfUuid = selfUuid,
                         onRetry = { viewModel.retry(message.id) },
                         onImageTap = { localPath -> viewModel.openFullscreen(localPath) },
+                        onLongPress = { reactingToMessage = message },
+                        onChipTap = { emoji ->
+                            // Toggle: if my current reaction matches this chip, remove it;
+                            // otherwise upsert with this chip's emoji.
+                            val mine = reactions.firstOrNull { it.fromUuid == selfUuid }
+                            val next = if (mine?.emoji == emoji) null else emoji
+                            viewModel.react(message.id, next)
+                        },
                     )
                 }
             }
@@ -303,18 +325,49 @@ fun ChatScreen(
             }
         }
 
+        reactingToMessage?.let { msg ->
+            ModalBottomSheet(
+                onDismissRequest = { reactingToMessage = null },
+                sheetState = reactionSheetState,
+            ) {
+                AndroidView(
+                    factory = { ctx ->
+                        EmojiPickerView(ctx).apply {
+                            setOnEmojiPickedListener { picked ->
+                                android.util.Log.d(
+                                    "ChatScreen",
+                                    "reaction picker picked emoji=${picked.emoji} for messageId=${msg.id}",
+                                )
+                                viewModel.react(msg.id, picked.emoji)
+                                reactingToMessage = null
+                            }
+                        }
+                    },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 320.dp, max = 480.dp),
+                )
+            }
+        }
+
         fullscreenPath?.let { path ->
             FullscreenImageDialog(path = path, onDismiss = { viewModel.closeFullscreen() })
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun MessageBubble(
     message: Message,
     isSelf: Boolean,
+    reactions: List<Reaction>,
+    selfUuid: String,
     onRetry: () -> Unit,
     onImageTap: (String) -> Unit,
+    onLongPress: () -> Unit,
+    onChipTap: (String) -> Unit,
 ) {
     val align = if (isSelf) Alignment.End else Alignment.Start
     val container =
@@ -334,7 +387,10 @@ private fun MessageBubble(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .then(if (retryable) Modifier.clickable(onClick = onRetry) else Modifier),
+                .combinedClickable(
+                    onClick = { if (retryable) onRetry() },
+                    onLongClick = onLongPress,
+                ),
         horizontalAlignment = align,
     ) {
         Column(
@@ -355,6 +411,14 @@ private fun MessageBubble(
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                 )
             }
+            if (reactions.isNotEmpty()) {
+                ReactionRow(
+                    reactions = reactions,
+                    selfUuid = selfUuid,
+                    isSelfBubble = isSelf,
+                    onChipTap = onChipTap,
+                )
+            }
         }
         Row(
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -370,6 +434,72 @@ private fun MessageBubble(
                 OutboundStatus(status = message.status)
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ReactionRow(
+    reactions: List<Reaction>,
+    selfUuid: String,
+    isSelfBubble: Boolean,
+    onChipTap: (String) -> Unit,
+) {
+    data class Group(
+        val emoji: String,
+        val count: Int,
+        val containsSelf: Boolean,
+    )
+    val groups =
+        reactions
+            .groupBy { it.emoji }
+            .map { (emoji, list) ->
+                Group(
+                    emoji = emoji,
+                    count = list.size,
+                    containsSelf = selfUuid.isNotEmpty() && list.any { it.fromUuid == selfUuid },
+                )
+            }
+    // Chips sit inside the bubble, so they must contrast with whichever
+    // container colour the bubble uses; pick a "highlight" tone for self
+    // reactions and a neutral surface tone for the rest.
+    val highlight = MaterialTheme.colorScheme.tertiaryContainer
+    val onHighlight = MaterialTheme.colorScheme.onTertiaryContainer
+    val neutral =
+        if (isSelfBubble) {
+            MaterialTheme.colorScheme.surface
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        }
+    val onNeutral = MaterialTheme.colorScheme.onSurface
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        FlowRow {
+            groups.forEach { group ->
+                val containerColor = if (group.containsSelf) highlight else neutral
+                val contentColor = if (group.containsSelf) onHighlight else onNeutral
+                Surface(
+                    color = containerColor,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.padding(end = 4.dp),
+                    onClick = { onChipTap(group.emoji) },
+                ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(text = group.emoji, style = MaterialTheme.typography.labelMedium)
+                    if (group.count > 1) {
+                        Spacer(modifier = Modifier.size(4.dp))
+                        Text(
+                            text = group.count.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = contentColor,
+                        )
+                    }
+                }
+            }
+        }
+    }
     }
 }
 
