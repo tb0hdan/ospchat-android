@@ -3,18 +3,24 @@ package com.ospchat.android.ui.groupchat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ospchat.android.data.groups.GroupInfo
 import com.ospchat.android.data.groups.GroupKind
 import com.ospchat.android.data.groups.GroupMessage
 import com.ospchat.android.data.groups.GroupMessageRepository
 import com.ospchat.android.data.groups.GroupRecord
 import com.ospchat.android.data.groups.GroupRepository
 import com.ospchat.android.data.identity.IdentityRepository
+import com.ospchat.android.domain.groups.LeaveGroupUseCase
 import com.ospchat.android.notifications.ActiveChatTracker
 import com.ospchat.android.notifications.MessageNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -28,6 +34,7 @@ class GroupChatViewModel
         private val groupRepository: GroupRepository,
         private val groupMessageRepository: GroupMessageRepository,
         private val identityRepository: IdentityRepository,
+        private val leaveGroup: LeaveGroupUseCase,
         private val activeChatTracker: ActiveChatTracker,
         private val notifier: MessageNotifier,
     ) : ViewModel() {
@@ -93,6 +100,42 @@ class GroupChatViewModel
         fun onChatHidden() {
             if (activeChatTracker.activeGroupId == groupId) {
                 activeChatTracker.activeGroupId = null
+            }
+        }
+
+        /**
+         * Full Info payload for the avatar-tap dialog. Lazily loaded the
+         * first time the user opens the dialog, then kept warm by
+         * [SharingStarted.WhileSubscribed] so re-opens are instantaneous.
+         */
+        val groupInfo: StateFlow<GroupInfo?> =
+            groupRepository
+                .observeInfo(groupId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+        private val _infoDialogVisible = MutableStateFlow(false)
+        val infoDialogVisible: StateFlow<Boolean> = _infoDialogVisible.asStateFlow()
+
+        fun showInfo() {
+            _infoDialogVisible.value = true
+        }
+
+        fun dismissInfo() {
+            _infoDialogVisible.value = false
+        }
+
+        /**
+         * One-shot signal emitted after the user leaves a group, telling the
+         * screen to navigate back. `extraBufferCapacity = 1` so the emission
+         * never suspends even if no collector is ready in time.
+         */
+        private val _leftGroup = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        val leftGroup: SharedFlow<Unit> = _leftGroup.asSharedFlow()
+
+        fun onLeave() {
+            viewModelScope.launch {
+                leaveGroup(groupId)
+                _leftGroup.tryEmit(Unit)
             }
         }
     }

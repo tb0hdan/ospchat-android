@@ -59,6 +59,7 @@
     <string name="group_action_remove_members">Remove members</string>
     <string name="group_action_leave">Leave group</string>
     <string name="group_action_info">Info</string>
+    <string name="group_chat_menu_content_description">Group actions</string>
 
     <string name="group_add_members_title">Add members</string>
     <string name="group_add_members_button">Add</string>

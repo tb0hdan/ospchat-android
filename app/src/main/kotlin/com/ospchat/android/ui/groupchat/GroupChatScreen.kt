@@ -1,6 +1,7 @@
 package com.ospchat.android.ui.groupchat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +55,7 @@ import com.ospchat.android.R
 import com.ospchat.android.data.groups.GroupKind
 import com.ospchat.android.data.groups.GroupMessage
 import com.ospchat.android.ui.avatar.Avatar
+import com.ospchat.android.ui.groups.GroupInfoDialog
 import com.ospchat.android.ui.groups.toAvatarModel
 import java.text.DateFormat
 import java.util.Date
@@ -65,6 +70,8 @@ fun GroupChatScreen(
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val selfUuid by viewModel.selfUuid.collectAsStateWithLifecycle()
     val canPost by viewModel.canPost.collectAsStateWithLifecycle()
+    val groupInfo by viewModel.groupInfo.collectAsStateWithLifecycle()
+    val infoDialogVisible by viewModel.infoDialogVisible.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -94,6 +101,12 @@ fun GroupChatScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.leftGroup.collect { onBack() }
+    }
+
+    var menuExpanded by remember { mutableStateOf(false) }
+
     var initialScrollDone by remember { mutableStateOf(false) }
     LaunchedEffect(messages.lastOrNull()?.id) {
         if (messages.isEmpty()) return@LaunchedEffect
@@ -111,7 +124,11 @@ fun GroupChatScreen(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         group?.let {
-                            Avatar(model = it.toAvatarModel(), size = 32.dp)
+                            Avatar(
+                                model = it.toAvatarModel(),
+                                size = 32.dp,
+                                modifier = Modifier.clickable { viewModel.showInfo() },
+                            )
                             Spacer(modifier = Modifier.size(10.dp))
                         }
                         Column {
@@ -135,6 +152,29 @@ fun GroupChatScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    if (group?.isCreator == false) {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription =
+                                    stringResource(R.string.group_chat_menu_content_description),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.group_action_leave)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    viewModel.onLeave()
+                                },
+                            )
+                        }
                     }
                 },
             )
@@ -187,6 +227,12 @@ fun GroupChatScreen(
                     )
                 }
             }
+        }
+    }
+
+    if (infoDialogVisible) {
+        groupInfo?.let { info ->
+            GroupInfoDialog(info = info, onDismiss = viewModel::dismissInfo)
         }
     }
 }
