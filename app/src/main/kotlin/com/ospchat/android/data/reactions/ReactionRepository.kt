@@ -20,14 +20,14 @@ class ReactionRepository
         private val identityRepository: IdentityRepository,
     ) {
         fun reactionsForPeer(peerUuid: String): Flow<List<Reaction>> =
-            dao.observeForPeer(peerUuid)
+            dao
+                .observeForPeer(peerUuid)
                 .onEach { rows ->
                     android.util.Log.d(
                         "ReactionRepo",
                         "DAO emit peerUuid=$peerUuid size=${rows.size} ids=${rows.map { it.messageId.take(8) + ":" + it.emoji }}",
                     )
-                }
-                .map { rows -> rows.map(ReactionEntity::toDomain) }
+                }.map { rows -> rows.map(ReactionEntity::toDomain) }
 
         /**
          * Local user reacts on [messageId] with [emoji], or removes their

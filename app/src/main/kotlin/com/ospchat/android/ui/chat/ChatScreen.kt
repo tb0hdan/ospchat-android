@@ -483,23 +483,23 @@ private fun ReactionRow(
                     modifier = Modifier.padding(end = 4.dp),
                     onClick = { onChipTap(group.emoji) },
                 ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(text = group.emoji, style = MaterialTheme.typography.labelMedium)
-                    if (group.count > 1) {
-                        Spacer(modifier = Modifier.size(4.dp))
-                        Text(
-                            text = group.count.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = contentColor,
-                        )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(text = group.emoji, style = MaterialTheme.typography.labelMedium)
+                        if (group.count > 1) {
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(
+                                text = group.count.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = contentColor,
+                            )
+                        }
                     }
                 }
             }
         }
-    }
     }
 }
 

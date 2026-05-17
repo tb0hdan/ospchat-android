@@ -9,6 +9,10 @@
 - Do not bump up VERSION unless specifically instructed.
 - Do not use co-authored ever.
 
+## Project Commands
+- Lint: `make lint` - non-zero exit code is a failure.
+- Build: `make build`
+
 ## Important Files
 - docs/PROJECT_NOTES.md - Contains project overview, goals, and current implementation status
 - Makefile - Contains build, test, and lint commands
