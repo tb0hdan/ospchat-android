@@ -1,6 +1,11 @@
 package com.ospchat.android.net.client
 
 import com.ospchat.android.data.discovery.Peer
+import com.ospchat.android.net.dto.GroupLeaveDto
+import com.ospchat.android.net.dto.GroupMessagePostDto
+import com.ospchat.android.net.dto.GroupSnapshotDto
+import com.ospchat.android.net.dto.GroupSyncRequestDto
+import com.ospchat.android.net.dto.GroupSyncResponseDto
 import com.ospchat.android.net.dto.IncomingMessageDto
 import com.ospchat.android.net.dto.InfoDto
 import com.ospchat.android.net.dto.ReactionDto
@@ -50,6 +55,42 @@ class MessageClient
             body: ReactionDto,
         ) {
             postJson(peer, "/v1/reactions", body)
+        }
+
+        suspend fun postGroupMessage(
+            peer: Peer,
+            body: GroupMessagePostDto,
+        ) {
+            postJson(peer, "/v1/groups/messages", body)
+        }
+
+        suspend fun postGroupMembership(
+            peer: Peer,
+            snapshot: GroupSnapshotDto,
+        ) {
+            postJson(peer, "/v1/groups/membership", snapshot)
+        }
+
+        suspend fun postGroupLeave(
+            peer: Peer,
+            body: GroupLeaveDto,
+        ) {
+            postJson(peer, "/v1/groups/leave", body)
+        }
+
+        suspend fun syncGroups(
+            peer: Peer,
+            request: GroupSyncRequestDto,
+        ): GroupSyncResponseDto {
+            val response: HttpResponse =
+                http.post("http://${peer.host}:${peer.port}/v1/groups/sync") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            if (!response.status.isSuccess()) {
+                error("Peer rejected /v1/groups/sync: HTTP ${response.status.value}")
+            }
+            return response.body()
         }
 
         /**

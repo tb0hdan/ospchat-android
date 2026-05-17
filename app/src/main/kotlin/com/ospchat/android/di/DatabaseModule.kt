@@ -8,9 +8,14 @@ import com.ospchat.android.data.db.MIGRATION_3_4
 import com.ospchat.android.data.db.MIGRATION_4_5
 import com.ospchat.android.data.db.MIGRATION_5_6
 import com.ospchat.android.data.db.MIGRATION_6_7
+import com.ospchat.android.data.db.MIGRATION_7_8
+import com.ospchat.android.data.db.MIGRATION_8_9
 import com.ospchat.android.data.db.OspChatDatabase
+import com.ospchat.android.data.groups.GroupDao
+import com.ospchat.android.data.groups.GroupMessageDao
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.peers.PeerDao
+import com.ospchat.android.data.peers.PeerHistoryDao
 import com.ospchat.android.data.reactions.ReactionDao
 import dagger.Module
 import dagger.Provides
@@ -36,6 +41,8 @@ object DatabaseModule {
                 MIGRATION_4_5,
                 MIGRATION_5_6,
                 MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9,
             ).build()
 
     @Provides
@@ -49,4 +56,16 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideReactionDao(database: OspChatDatabase): ReactionDao = database.reactionDao()
+
+    @Provides
+    @Singleton
+    fun providePeerHistoryDao(database: OspChatDatabase): PeerHistoryDao = database.peerHistoryDao()
+
+    @Provides
+    @Singleton
+    fun provideGroupDao(database: OspChatDatabase): GroupDao = database.groupDao()
+
+    @Provides
+    @Singleton
+    fun provideGroupMessageDao(database: OspChatDatabase): GroupMessageDao = database.groupMessageDao()
 }

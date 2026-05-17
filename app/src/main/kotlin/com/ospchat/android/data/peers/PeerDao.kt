@@ -31,4 +31,10 @@ interface PeerDao {
         hash: String?,
         localPath: String?,
     )
+
+    @Query("UPDATE peers SET is_contact = :isContact WHERE uuid = :uuid")
+    suspend fun setIsContact(
+        uuid: String,
+        isContact: Boolean,
+    )
 }

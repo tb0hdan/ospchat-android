@@ -9,6 +9,26 @@
 
     <string name="peers_empty">No peers found yet. Open OSPChat on another device on the same Wi-Fi.</string>
     <string name="peers_unread_content_description">Unread messages</string>
+    <string name="peers_offline">offline</string>
+
+    <string name="peers_section_contacts">Contacts</string>
+    <string name="peers_section_contacts_empty">No contacts yet. Long-press a peer below to save one.</string>
+    <string name="peers_section_peers">Peers</string>
+    <string name="peers_section_peers_empty">No peers visible. Make sure you are on the same Wi-Fi.</string>
+    <string name="peers_section_count">(%1$d)</string>
+
+    <string name="peer_action_add_contact">Add to contacts</string>
+    <string name="peer_action_remove_contact">Remove from contacts</string>
+    <string name="peer_action_info">Info</string>
+
+    <string name="peer_info_close">Close</string>
+    <string name="peer_info_online">Online</string>
+    <string name="peer_info_last_seen">Last seen %1$s</string>
+    <string name="peer_info_current_address">Current address</string>
+    <string name="peer_info_previous_addresses">Previous addresses</string>
+    <string name="peer_info_nickname_history">Previous nicknames</string>
+    <string name="peer_info_first_seen">First seen</string>
+    <string name="peer_info_uuid">UUID</string>
 
     <string name="tab_contacts">Contacts</string>
     <string name="tab_groups">Groups</string>
@@ -16,16 +36,61 @@
 
     <string name="groups_empty">Group chats are coming in a future release.</string>
 
+    <string name="groups_section_chats">Group chats</string>
+    <string name="groups_section_chats_empty">No group chats yet. Tap the New group button to start one.</string>
+    <string name="groups_section_broadcasts">Broadcast channels</string>
+    <string name="groups_section_broadcasts_empty">No broadcast channels yet.</string>
+
+    <string name="group_new_fab">New group</string>
+    <string name="group_new_title">Create a group</string>
+    <string name="group_new_name_label">Group name</string>
+    <string name="group_new_members_label">Members (from your contacts)</string>
+    <string name="group_new_no_contacts">No contacts yet. Save a peer as a contact first.</string>
+    <string name="group_new_create_button">Create</string>
+
+    <string name="group_kind_chat">Group chat</string>
+    <string name="group_kind_chat_hint">Any member can post</string>
+    <string name="group_kind_broadcast">Broadcast channel</string>
+    <string name="group_kind_broadcast_hint">Only the creator can post</string>
+    <string name="group_kind_broadcast_short">Broadcast</string>
+    <string name="group_broadcast_read_only">Only the creator can post in this channel.</string>
+
+    <string name="group_action_add_members">Add members</string>
+    <string name="group_action_remove_members">Remove members</string>
+    <string name="group_action_leave">Leave group</string>
+    <string name="group_action_info">Info</string>
+
+    <string name="group_add_members_title">Add members</string>
+    <string name="group_add_members_button">Add</string>
+    <string name="group_remove_members_title">Remove members</string>
+    <string name="group_remove_members_button">Remove</string>
+    <string name="group_picker_empty">No candidates available.</string>
+
+    <string name="group_info_creator">Creator</string>
+    <string name="group_info_creator_tag">(creator)</string>
+    <string name="group_info_created_at">Created</string>
+    <string name="group_info_members">Members</string>
+
+    <plurals name="group_member_count">
+        <item quantity="one">%1$d member</item>
+        <item quantity="other">%1$d members</item>
+    </plurals>
+
     <string name="about_version_label">Version %1$s</string>
     <string name="about_settings_header">Settings</string>
     <string name="about_nickname_save">Save</string>
     <string name="about_avatar_header">Avatar</string>
     <string name="about_avatar_change">Change image</string>
     <string name="about_avatar_reset">Reset to initials</string>
+    <string name="about_exit">Exit OSPChat</string>
+    <string name="about_exit_cancel">Cancel</string>
+    <string name="about_exit_confirm_title">Exit OSPChat?</string>
+    <string name="about_exit_confirm_message">Discovery and messaging will stop, and OSPChat will be removed from your recent apps. Other peers will no longer see you on the network until you re-open the app.</string>
 
     <string name="notification_channel_discovery">Peer discovery</string>
     <string name="notification_title">OSPChat</string>
     <string name="notification_text">Looking for nearby peers</string>
+    <string name="notification_action_exit">Exit</string>
 
     <string name="notification_channel_messages">Messages</string>
     <string name="notification_channel_messages_desc">New chat messages from peers on your network.</string>

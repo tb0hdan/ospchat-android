@@ -3,6 +3,7 @@ package com.ospchat.android.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -12,8 +13,10 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.ospchat.android.MainActivity
 import com.ospchat.android.R
 import com.ospchat.android.data.discovery.DiscoveryRepository
+import com.ospchat.android.data.groups.GroupSyncer
 import com.ospchat.android.data.identity.IdentityRepository
 import com.ospchat.android.data.peers.PeerAvatarSync
 import com.ospchat.android.data.peers.PeerRepository
@@ -52,6 +55,8 @@ class DiscoveryForegroundService : Service() {
     @Inject lateinit var peerRepository: PeerRepository
 
     @Inject lateinit var peerAvatarSync: PeerAvatarSync
+
+    @Inject lateinit var groupSyncer: GroupSyncer
 
     @Inject lateinit var messageServer: MessageServer
 
@@ -119,6 +124,7 @@ class DiscoveryForegroundService : Service() {
                                 (current - previous).forEach { uuid ->
                                     val peer = snapshot[uuid] ?: return@forEach
                                     launch { peerAvatarSync.sync(peer) }
+                                    launch { groupSyncer.sync(peer) }
                                 }
                                 previous = current
                             }
@@ -153,6 +159,18 @@ class DiscoveryForegroundService : Service() {
     }
 
     private fun startForegroundNotification() {
+        val exitIntent =
+            Intent(this, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_EXIT
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+        val exitPendingIntent =
+            PendingIntent.getActivity(
+                this,
+                EXIT_REQUEST_CODE,
+                exitIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
         val notification: Notification =
             NotificationCompat
                 .Builder(this, CHANNEL_ID)
@@ -162,7 +180,11 @@ class DiscoveryForegroundService : Service() {
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setCategory(NotificationCompat.CATEGORY_SERVICE)
-                .build()
+                .addAction(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    getString(R.string.notification_action_exit),
+                    exitPendingIntent,
+                ).build()
 
         ServiceCompat.startForeground(
             this,
@@ -206,6 +228,7 @@ class DiscoveryForegroundService : Service() {
         private const val CHANNEL_ID = "ospchat_discovery"
         private const val NOTIFICATION_ID = 1
         private const val MULTICAST_LOCK_TAG = "ospchat-mdns"
+        private const val EXIT_REQUEST_CODE = 100
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, DiscoveryForegroundService::class.java))

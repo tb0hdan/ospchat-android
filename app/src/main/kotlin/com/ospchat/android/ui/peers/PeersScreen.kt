@@ -5,11 +5,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,22 +18,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.Badge
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,7 +55,8 @@ fun PeersScreen(
     viewModel: PeersViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val peers by viewModel.peers.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val peerInfo by viewModel.peerInfo.collectAsStateWithLifecycle()
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
@@ -82,54 +82,92 @@ fun PeersScreen(
         }
     }
 
-    if (peers.isEmpty()) {
-        EmptyPeers()
-    } else {
-        PeerList(peers = peers, onPeerClick = onPeerClick)
+    when (val state = uiState) {
+        ContactsUiState.Loading -> {
+            Unit
+        }
+
+        is ContactsUiState.Ready -> {
+            ContactsTabContent(
+                state = state,
+                onPeerClick = onPeerClick,
+                onAddContact = viewModel::onAddContact,
+                onRemoveContact = viewModel::onRemoveContact,
+                onShowInfo = viewModel::showInfo,
+            )
+        }
+    }
+
+    peerInfo?.let { info ->
+        PeerInfoDialog(info = info, onDismiss = viewModel::dismissInfo)
     }
 }
 
 @Composable
-private fun EmptyPeers() {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = stringResource(R.string.peers_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun PeerList(
-    peers: List<PeerRecord>,
+private fun ContactsTabContent(
+    state: ContactsUiState.Ready,
     onPeerClick: (PeerRecord) -> Unit,
+    onAddContact: (String) -> Unit,
+    onRemoveContact: (String) -> Unit,
+    onShowInfo: (String) -> Unit,
 ) {
+    var contactsExpanded by rememberSaveable { mutableStateOf(true) }
+    var peersExpanded by rememberSaveable { mutableStateOf(true) }
+
+    val contactsTitle = stringResource(R.string.peers_section_contacts)
+    val contactsEmpty = stringResource(R.string.peers_section_contacts_empty)
+    val peersTitle = stringResource(R.string.peers_section_peers)
+    val peersEmpty = stringResource(R.string.peers_section_peers_empty)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Top,
     ) {
-        items(peers, key = { it.uuid }) { peer ->
-            PeerRow(peer = peer, onClick = { onPeerClick(peer) })
-            HorizontalDivider()
-        }
+        peerSection(
+            peers = state.contacts,
+            keyPrefix = "c",
+            expanded = contactsExpanded,
+            onToggle = { contactsExpanded = !contactsExpanded },
+            title = contactsTitle,
+            emptyHint = contactsEmpty,
+            onPeerClick = onPeerClick,
+            onAddContact = onAddContact,
+            onRemoveContact = onRemoveContact,
+            onShowInfo = onShowInfo,
+        )
+        peerSection(
+            peers = state.peers,
+            keyPrefix = "p",
+            expanded = peersExpanded,
+            onToggle = { peersExpanded = !peersExpanded },
+            title = peersTitle,
+            emptyHint = peersEmpty,
+            onPeerClick = onPeerClick,
+            onAddContact = onAddContact,
+            onRemoveContact = onRemoveContact,
+            onShowInfo = onShowInfo,
+        )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PeerRow(
+internal fun PeerRow(
     peer: PeerRecord,
     onClick: () -> Unit,
+    onAddContact: () -> Unit,
+    onRemoveContact: () -> Unit,
+    onShowInfo: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
+    var menuExpanded by remember { mutableStateOf(false) }
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { menuExpanded = true },
+                ),
     ) {
         Row(
             modifier =
@@ -150,7 +188,7 @@ private fun PeerRow(
                         if (peer.isOnline) {
                             "${peer.host}:${peer.port}"
                         } else {
-                            "offline"
+                            stringResource(R.string.peers_offline)
                         },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -162,6 +200,14 @@ private fun PeerRow(
             }
             StatusDot(isOnline = peer.isOnline)
         }
+        PeerActionMenu(
+            expanded = menuExpanded,
+            isContact = peer.isContact,
+            onAddContact = onAddContact,
+            onRemoveContact = onRemoveContact,
+            onShowInfo = onShowInfo,
+            onDismiss = { menuExpanded = false },
+        )
     }
 }
 
@@ -179,7 +225,7 @@ private fun UnreadIndicator(count: Int) {
     }
 }
 
-private fun PeerRecord.toAvatarModel(): AvatarModel =
+internal fun PeerRecord.toAvatarModel(): AvatarModel =
     if (avatarLocalPath != null) {
         AvatarModel.Custom(avatarLocalPath)
     } else {

@@ -13,6 +13,11 @@ import androidx.room.PrimaryKey
  *
  * [avatarHash] / [avatarLocalPath] track the peer's custom avatar (when they
  * have one). `null` for both means we render initials for that peer.
+ *
+ * [isContact] is `true` when the local user has explicitly saved this peer to
+ * their contacts. Contacts remain visible in the Contacts section regardless
+ * of online status; non-contacts only render in the Peers section while
+ * present in the live NSD snapshot.
  */
 @Entity(tableName = "peers")
 data class PeerEntity(
@@ -25,4 +30,5 @@ data class PeerEntity(
     @ColumnInfo(name = "last_read_at") val lastReadAt: Long = 0L,
     @ColumnInfo(name = "avatar_hash") val avatarHash: String? = null,
     @ColumnInfo(name = "avatar_local_path") val avatarLocalPath: String? = null,
+    @ColumnInfo(name = "is_contact") val isContact: Boolean = false,
 )

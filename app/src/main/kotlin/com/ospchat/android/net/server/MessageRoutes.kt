@@ -4,6 +4,9 @@ import com.ospchat.android.data.attachments.AttachmentStore
 import com.ospchat.android.data.avatar.AvatarStore
 import com.ospchat.android.data.discovery.DiscoveryRepository
 import com.ospchat.android.data.discovery.Peer
+import com.ospchat.android.data.groups.GroupMessageRepository
+import com.ospchat.android.data.groups.GroupRepository
+import com.ospchat.android.data.groups.GroupSyncer
 import com.ospchat.android.data.identity.IdentityRepository
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.messages.MessageRepository
@@ -11,6 +14,10 @@ import com.ospchat.android.data.peers.PeerAvatarSync
 import com.ospchat.android.data.reactions.ReactionRepository
 import com.ospchat.android.net.ApiVersion
 import com.ospchat.android.net.dto.ErrorDto
+import com.ospchat.android.net.dto.GroupLeaveDto
+import com.ospchat.android.net.dto.GroupMessagePostDto
+import com.ospchat.android.net.dto.GroupSnapshotDto
+import com.ospchat.android.net.dto.GroupSyncRequestDto
 import com.ospchat.android.net.dto.IncomingMessageDto
 import com.ospchat.android.net.dto.InfoDto
 import com.ospchat.android.net.dto.ReactionDto
@@ -43,6 +50,9 @@ internal fun Routing.installMessageRoutes(
     identityRepository: IdentityRepository,
     peerAvatarSync: PeerAvatarSync,
     reactionRepository: ReactionRepository,
+    groupMessageRepository: GroupMessageRepository,
+    groupRepository: GroupRepository,
+    groupSyncer: GroupSyncer,
 ) {
     route("/v1") {
         get("/info") {
@@ -119,6 +129,39 @@ internal fun Routing.installMessageRoutes(
             }
             call.respondOutputStream(contentType = ContentType.Image.JPEG) {
                 file.inputStream().use { it.copyTo(this) }
+            }
+        }
+        route("/groups") {
+            post("/messages") {
+                val dto = call.receive<GroupMessagePostDto>()
+                val known =
+                    call.verifiedPeerOrRespond(dto.message.fromUuid, discoveryRepository)
+                        ?: return@post
+                groupMessageRepository.receive(known, dto)
+                call.respond(HttpStatusCode.Accepted)
+            }
+            post("/membership") {
+                val snapshot = call.receive<GroupSnapshotDto>()
+                val known =
+                    call.verifiedPeerOrRespond(snapshot.creatorUuid, discoveryRepository)
+                        ?: return@post
+                // Trust check inside applySnapshot: only adopts when the
+                // sender is the group's creator and version is newer.
+                groupRepository.applySnapshot(fromUuid = known.uuid, snapshot = snapshot)
+                call.respond(HttpStatusCode.Accepted)
+            }
+            post("/sync") {
+                val req = call.receive<GroupSyncRequestDto>()
+                call.verifiedPeerOrRespond(req.fromUuid, discoveryRepository) ?: return@post
+                val response = groupSyncer.buildResponse(req)
+                call.respond(response)
+            }
+            post("/leave") {
+                val dto = call.receive<GroupLeaveDto>()
+                val known =
+                    call.verifiedPeerOrRespond(dto.fromUuid, discoveryRepository) ?: return@post
+                groupRepository.applyRemoteLeave(groupId = dto.groupId, fromUuid = known.uuid)
+                call.respond(HttpStatusCode.Accepted)
             }
         }
     }

@@ -3,6 +3,9 @@ package com.ospchat.android.net.server
 import com.ospchat.android.data.attachments.AttachmentStore
 import com.ospchat.android.data.avatar.AvatarStore
 import com.ospchat.android.data.discovery.DiscoveryRepository
+import com.ospchat.android.data.groups.GroupMessageRepository
+import com.ospchat.android.data.groups.GroupRepository
+import com.ospchat.android.data.groups.GroupSyncer
 import com.ospchat.android.data.identity.IdentityRepository
 import com.ospchat.android.data.messages.MessageDao
 import com.ospchat.android.data.messages.MessageRepository
@@ -49,6 +52,9 @@ class MessageServer
         private val identityRepository: IdentityRepository,
         private val peerAvatarSync: PeerAvatarSync,
         private val reactionRepository: ReactionRepository,
+        private val groupMessageRepository: GroupMessageRepository,
+        private val groupRepository: GroupRepository,
+        private val groupSyncer: GroupSyncer,
     ) {
         @Volatile private var engine: ApplicationEngine? = null
 
@@ -95,6 +101,9 @@ class MessageServer
                             identityRepository = identityRepository,
                             peerAvatarSync = peerAvatarSync,
                             reactionRepository = reactionRepository,
+                            groupMessageRepository = groupMessageRepository,
+                            groupRepository = groupRepository,
+                            groupSyncer = groupSyncer,
                         )
                     }
                 }

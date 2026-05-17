@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.ospchat.android.R
+import com.ospchat.android.data.groups.GroupRecord
 import com.ospchat.android.data.peers.PeerRecord
 import com.ospchat.android.ui.about.AboutScreen
 import com.ospchat.android.ui.groups.GroupsScreen
@@ -31,7 +32,10 @@ import com.ospchat.android.ui.peers.PeersScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainShell(onPeerClick: (PeerRecord) -> Unit) {
+fun MainShell(
+    onPeerClick: (PeerRecord) -> Unit,
+    onGroupClick: (GroupRecord) -> Unit,
+) {
     var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
 
     Scaffold(
@@ -59,7 +63,7 @@ fun MainShell(onPeerClick: (PeerRecord) -> Unit) {
         ) {
             when (MainTab.entries[selectedIndex]) {
                 MainTab.Contacts -> PeersScreen(onPeerClick = onPeerClick)
-                MainTab.Groups -> GroupsScreen()
+                MainTab.Groups -> GroupsScreen(onGroupClick = onGroupClick)
                 MainTab.About -> AboutScreen()
             }
         }

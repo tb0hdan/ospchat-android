@@ -1,6 +1,7 @@
 package com.ospchat.android.ui.about
 
 import android.content.Intent
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,7 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -36,7 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ospchat.android.MainActivity
 import com.ospchat.android.R
+import com.ospchat.android.service.DiscoveryForegroundService
 import com.ospchat.android.ui.avatar.Avatar
 import com.ospchat.android.ui.avatar.AvatarModel
 
@@ -47,6 +52,7 @@ fun AboutScreen(viewModel: AboutViewModel = hiltViewModel()) {
     val selfAvatar by viewModel.selfAvatar.collectAsStateWithLifecycle()
     var editedNickname by remember(currentNickname) { mutableStateOf(currentNickname.orEmpty()) }
     val keyboard = LocalSoftwareKeyboardController.current
+    var showExitConfirm by remember { mutableStateOf(false) }
 
     val avatarPickerLauncher =
         rememberLauncherForActivityResult(
@@ -143,6 +149,62 @@ fun AboutScreen(viewModel: AboutViewModel = hiltViewModel()) {
         ) {
             Text(stringResource(R.string.about_nickname_save))
         }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+        Button(
+            onClick = { showExitConfirm = true },
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+        ) {
+            Text(stringResource(R.string.about_exit))
+        }
+    }
+
+    if (showExitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            title = { Text(stringResource(R.string.about_exit_confirm_title)) },
+            text = { Text(stringResource(R.string.about_exit_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitConfirm = false
+                    exitOspChat(context)
+                }) {
+                    Text(stringResource(R.string.about_exit))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirm = false }) {
+                    Text(stringResource(R.string.about_exit_cancel))
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Stop the discovery foreground service and remove this task from the
+ * recents list. Mirrors the path taken by the notification's Exit action,
+ * so the two entry points share teardown semantics.
+ */
+private fun exitOspChat(context: android.content.Context) {
+    DiscoveryForegroundService.stop(context)
+    val activity = context as? ComponentActivity
+    if (activity != null) {
+        activity.finishAndRemoveTask()
+    } else {
+        // No Activity in scope — route through MainActivity so the
+        // activity-side handler performs the teardown.
+        context.startActivity(
+            Intent(context, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_EXIT
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+        )
     }
 }
 

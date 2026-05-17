@@ -24,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.ospchat.android.ui.chat.ChatScreen
+import com.ospchat.android.ui.groupchat.GroupChatScreen
 import com.ospchat.android.ui.main.MainShell
 import com.ospchat.android.ui.nickname.NicknameScreen
 
@@ -47,6 +48,7 @@ private fun MainNav() {
         composable(Routes.MAIN) {
             MainShell(
                 onPeerClick = { peer -> navController.navigate(Routes.chat(peer.uuid)) },
+                onGroupClick = { group -> navController.navigate(Routes.group(group.id)) },
             )
         }
         composable(
@@ -55,6 +57,13 @@ private fun MainNav() {
             deepLinks = listOf(navDeepLink { uriPattern = "ospchat://chat/{${Routes.PEER_UUID_ARG}}" }),
         ) {
             ChatScreen(onBack = { navController.popBackStack() })
+        }
+        composable(
+            route = Routes.GROUP_PATTERN,
+            arguments = listOf(navArgument(Routes.GROUP_ID_ARG) { type = NavType.StringType }),
+            deepLinks = listOf(navDeepLink { uriPattern = "ospchat://group/{${Routes.GROUP_ID_ARG}}" }),
+        ) {
+            GroupChatScreen(onBack = { navController.popBackStack() })
         }
     }
 }
@@ -89,6 +98,10 @@ private object Routes {
     const val MAIN = "main"
     const val PEER_UUID_ARG = "peerUuid"
     const val CHAT_PATTERN = "chat/{$PEER_UUID_ARG}"
+    const val GROUP_ID_ARG = "groupId"
+    const val GROUP_PATTERN = "group/{$GROUP_ID_ARG}"
 
     fun chat(peerUuid: String) = "chat/$peerUuid"
+
+    fun group(groupId: String) = "group/$groupId"
 }

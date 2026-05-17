@@ -15,6 +15,8 @@ import androidx.core.net.toUri
 import com.ospchat.android.MainActivity
 import com.ospchat.android.R
 import com.ospchat.android.data.discovery.Peer
+import com.ospchat.android.data.groups.GroupEntity
+import com.ospchat.android.data.groups.GroupMessage
 import com.ospchat.android.data.messages.Message
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -78,6 +80,49 @@ class MessageNotifier
             notificationManager.cancel(peerUuid.hashCode())
         }
 
+        /**
+         * Same shape as [notifyIncoming] but for inbound group messages. The
+         * notification title is the group name; the body is
+         * `nickname: text`. Tap deep-links via `ospchat://group/{groupId}`.
+         */
+        fun notifyIncomingGroup(
+            group: GroupEntity,
+            message: GroupMessage,
+        ) {
+            if (activeChatTracker.activeGroupId == group.id) return
+            if (notificationManager.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+
+            val body = "${message.fromNickname}: ${message.body}"
+            val notification: Notification =
+                NotificationCompat
+                    .Builder(context, CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.stat_notify_chat)
+                    .setContentTitle(group.name)
+                    .setContentText(body)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                    .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                    .setContentIntent(openGroupPendingIntent(group.id))
+                    .setAutoCancel(true)
+                    .setWhen(message.sentAt)
+                    .build()
+
+            notificationManager.notify(group.id.hashCode(), notification)
+        }
+
+        fun cancelGroup(groupId: String) {
+            notificationManager.cancel(groupId.hashCode())
+        }
+
         private fun openChatPendingIntent(peerUuid: String): PendingIntent {
             val intent =
                 Intent(Intent.ACTION_VIEW, "ospchat://chat/$peerUuid".toUri()).apply {
@@ -87,6 +132,20 @@ class MessageNotifier
             return PendingIntent.getActivity(
                 context,
                 peerUuid.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+        private fun openGroupPendingIntent(groupId: String): PendingIntent {
+            val intent =
+                Intent(Intent.ACTION_VIEW, "ospchat://group/$groupId".toUri()).apply {
+                    setClass(context, MainActivity::class.java)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+            return PendingIntent.getActivity(
+                context,
+                groupId.hashCode(),
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )

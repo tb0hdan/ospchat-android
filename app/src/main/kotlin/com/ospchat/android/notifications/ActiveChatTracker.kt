@@ -16,4 +16,11 @@ class ActiveChatTracker
     @Inject
     constructor() {
         @Volatile var activePeerUuid: String? = null
+
+        /**
+         * Group id of the conversation the user is currently looking at, used
+         * by [MessageNotifier.notifyIncomingGroup] to suppress notifications
+         * for the group already on screen.
+         */
+        @Volatile var activeGroupId: String? = null
     }

@@ -162,6 +162,44 @@ ospchat-android/
   adds the `reactions` table with composite PK `(message_id, from_uuid)`
   via `MIGRATION_6_7`. Wire: `POST /v1/reactions` (`emoji == null` =
   remove). OpenAPI 0.7.0.
+- 2026-05-17 — **unreleased**: contacts + foldable Contacts tab. The
+  tab now hosts two foldable sections (`Contacts` for saved peers,
+  online or offline; `Peers` for live LAN discoveries that are not
+  yet saved). Long-press on any row opens a Material 3 `DropdownMenu`
+  with Add/Remove and Info; the Info dialog renders avatar, current
+  address, online or relative last-seen, first-seen, full UUID, all
+  previously-observed addresses, and all previously-observed
+  nicknames. Contacts persist by UUID across IP changes and app
+  restarts. Room v8 with `MIGRATION_7_8`: new column
+  `peers.is_contact INTEGER NOT NULL DEFAULT 0`; new
+  `peer_addresses(uuid, host, port, first_seen_at, last_seen_at)`
+  and `peer_nicknames(uuid, nickname, first_seen_at, last_seen_at)`
+  history tables with composite PKs, backfilled from the existing
+  `peers` row. History rows are written from inside
+  `PeerRepository.recordSeen` via `PeerHistoryRecorder`. New
+  `AddToContactsUseCase` / `RemoveFromContactsUseCase` under
+  `domain/contacts/`. UI state moves to a sealed `ContactsUiState`
+  (`Loading` / `Ready(contacts, peers)`). History tables are pruned
+  to the 10 most-recent rows per peer on every `recordSeen` so
+  storage stays bounded under DHCP churn.
+- 2026-05-17 — **unreleased**: explicit Exit. The persistent
+  notification posts an "Exit" action; the About screen carries an
+  "Exit OSPChat" button with a confirmation dialog. Both routes
+  funnel through `MainActivity.ACTION_EXIT`, which stops
+  `DiscoveryForegroundService` and calls `finishAndRemoveTask()`.
+- 2026-05-17 — **unreleased**: group chats + broadcast channels.
+  Groups tab now has two foldable sections (Group chats / Broadcast
+  channels). FAB → new-group sheet. Long-press menu offers
+  Add/Remove members (creator), Leave (members), and Info. Posting
+  is **mesh-direct** between members — the creator is not a routing
+  hub, so the group keeps working when they're offline.
+  **History sync** runs on every NSD re-discovery and exchanges
+  cursors with shared-group peers, so any member can serve catch-up
+  history. Room v9 with `MIGRATION_8_9` adds `groups`,
+  `group_members`, `group_messages` tables. OpenAPI 0.8.0 adds
+  `/v1/groups/{messages,membership,sync,leave}`. Trust model: only
+  the creator's snapshot can change membership; broadcast channels
+  reject posts from non-creators.
 
 ## Known Limitations
 

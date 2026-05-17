@@ -6,6 +6,114 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Added — contacts + foldable peer list
+- The Contacts tab is now organized into two foldable sections:
+  **Contacts** (peers the user has explicitly saved, online or offline)
+  and **Peers** (live LAN discoveries that are not yet saved contacts).
+  Both sections start expanded; fold state is preserved across
+  recomposition via `rememberSaveable`. Empty sections still show
+  the header plus a hint line so the affordance is discoverable.
+- **Long-pressing a peer row** anywhere in either section opens a
+  Material 3 `DropdownMenu` with two items: **Add to contacts** /
+  **Remove from contacts** (the action swaps based on the row's
+  current `is_contact` flag), and **Info**.
+- **Info dialog** shows the peer's avatar, current `host:port`,
+  online state or relative last-seen time, first-seen time, full
+  UUID (monospace), all previously-observed addresses, and all
+  previously-observed nicknames.
+- Contacts persist by UUID: promoting a peer survives IP changes,
+  app restarts, and going offline. `PeerRepository.recordSeen`
+  preserves the contact flag across re-discovery upserts.
+- Room schema **v8** with non-destructive `MIGRATION_7_8`:
+  - `peers.is_contact INTEGER NOT NULL DEFAULT 0`
+  - `peer_addresses(uuid, host, port, first_seen_at, last_seen_at)`
+    with composite PK `(uuid, host, port)`
+  - `peer_nicknames(uuid, nickname, first_seen_at, last_seen_at)`
+    with composite PK `(uuid, nickname)`
+  - Both history tables are backfilled from the existing `peers`
+    row on migration so pre-existing peers retain at least one
+    history entry each.
+- History rows are written from inside `PeerRepository.recordSeen`
+  via a dedicated `PeerHistoryRecorder` helper, keeping all NSD
+  reconciliation funneled through a single entry point. The
+  `INSERT OR IGNORE` + `UPDATE last_seen_at` pair on the composite
+  primary key preserves the original `first_seen_at` regardless of
+  how many times the same address/nickname tuple recurs.
+- New `AddToContactsUseCase` / `RemoveFromContactsUseCase`
+  (`domain/contacts/`) keep the ViewModel free of repository
+  details and become the natural home for any future contact-side
+  effects (e.g. cross-device sync).
+- **Per-peer history is bounded to the 10 most-recent rows per
+  table.** `PeerHistoryRecorder` calls new `PeerHistoryDao.prune*`
+  queries after each upsert; both `peer_addresses` and
+  `peer_nicknames` are independently capped via a single SQLite
+  `DELETE … WHERE (composite-pk) NOT IN (SELECT … LIMIT N)`
+  statement scoped to the peer's partition. Storage no longer
+  grows monotonically under DHCP churn or repeated renames.
+
+### Added — group chats + broadcast channels
+- The Groups tab now hosts two foldable sections — **Group chats**
+  (any member may post) and **Broadcast channels** (only the
+  creator may post). A floating "New group" button opens a sheet
+  for naming, picking the kind, and selecting initial members
+  from the user's saved contacts.
+- Long-press on any group row opens a Material 3 `DropdownMenu`.
+  Creators see **Add members** / **Remove members** / **Info**.
+  Non-creator members see **Leave group** / **Info**. Membership
+  changes bump `membership_updated_at` and are pushed to current
+  members; offline members converge on next catch-up.
+- **Mesh delivery, not creator-hub**. Every member posts directly
+  to every other current member. Groups remain usable when the
+  creator is offline. Posts to currently-offline members are
+  caught up via bidirectional history sync.
+- **Catch-up sync** runs on every NSD "absent → present" peer
+  transition, mirroring the existing avatar-sync hook. Each side
+  exchanges `(groupId, latestSentAt)` cursors with the peer and
+  fetches missing messages. History is therefore available even
+  when the original sender is permanently offline, as long as
+  *any* current member has it.
+- **Trust model**: membership changes are only accepted from the
+  creator; receivers reject `BROADCAST` posts from non-creators.
+  Snapshot version (`membership_updated_at`) provides last-writer-
+  wins ordering across rapid creator-side edits.
+- Group messages reuse the existing notification channel
+  (`ospchat_messages`); titles use the group name, bodies are
+  prefixed with the sender nickname. Notifications are suppressed
+  when the user is already viewing the group chat. Deep link
+  `ospchat://group/{groupId}` routes straight into the chat.
+- Room schema **v9** with non-destructive `MIGRATION_8_9` adding
+  three tables:
+  - `groups(id, name, kind, creator_uuid, created_at,
+    membership_updated_at, last_read_at)`
+  - `group_members(group_id, member_uuid, member_nickname,
+    joined_at)` with composite PK
+  - `group_messages(id, group_id, from_uuid, from_nickname, body,
+    sent_at, direction, status)` with `(group_id, sent_at)` index
+- OpenAPI **0.8.0** adds the `groups` tag with four endpoints:
+  - `POST /v1/groups/messages` — mesh-delivered message (carries
+    a `GroupSnapshot` so receivers auto-create the group)
+  - `POST /v1/groups/membership` — creator pushes snapshot
+  - `POST /v1/groups/sync` — bidirectional history catch-up
+  - `POST /v1/groups/leave` — self-removal
+- Layered architecture: `data/groups/` (entities, DAOs,
+  repositories, `GroupHistoryRecorder`-style `GroupSyncer`),
+  `domain/groups/` (`CreateGroupUseCase`,
+  `AddGroupMembersUseCase`, `RemoveGroupMembersUseCase`,
+  `LeaveGroupUseCase`, `GroupBroadcaster`),
+  `ui/groups/` + `ui/groupchat/` for the new screens.
+
+### Added — explicit exit
+- The persistent foreground-service notification gains an **Exit**
+  action button. Tapping it routes through `MainActivity` with a
+  new `ACTION_EXIT` intent, which stops `DiscoveryForegroundService`
+  (releasing the multicast lock, the Ktor server, and the ongoing
+  notification) and calls `finishAndRemoveTask()` so the app
+  disappears from the recents list.
+- The About screen gains a destructive **Exit OSPChat** button at
+  the bottom (error-container tint). It opens a Material 3
+  `AlertDialog` confirmation; on confirm it runs the same teardown
+  path as the notification action.
+
 ## [0.1.13] - 2026-05-16
 
 ### Added — message reactions

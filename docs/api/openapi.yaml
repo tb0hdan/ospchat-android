@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OSPChat Peer API
-  version: 0.7.0
+  version: 0.8.0
   description: |
     REST API exposed by every OSPChat peer on the local network. Each running
     instance binds an embedded Ktor server to an ephemeral TCP port; that port
@@ -40,6 +40,8 @@ tags:
     description: Endpoints for handshake / probing.
   - name: messages
     description: Endpoints for exchanging chat messages.
+  - name: groups
+    description: Endpoints for group chats and broadcast channels.
 paths:
   /v1/info:
     get:
@@ -267,6 +269,115 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /v1/groups/messages:
+    post:
+      tags: [groups]
+      summary: Post a message to a group.
+      description: |
+        Mesh-delivered group message. The poster sends this directly to
+        every other current member (excluding themselves). Each request
+        carries a fresh `GroupSnapshot` so the receiver auto-creates the
+        group on first contact and adopts membership updates when the
+        sender is the creator AND the snapshot is newer.
+
+        For `BROADCAST` groups, the receiver rejects messages where
+        `fromUuid != creatorUuid`.
+
+        Authenticated by `message.fromUuid` against the live NSD snapshot.
+      operationId: postGroupMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupMessagePost"
+      responses:
+        "202":
+          description: Accepted.
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/groups/membership:
+    post:
+      tags: [groups]
+      summary: Push a membership snapshot.
+      description: |
+        Creator-only operation. Sent by the creator after every add/remove
+        to push the new snapshot to current members. Receivers ignore the
+        snapshot unless the sender is the group's creator AND
+        `membershipUpdatedAt` is strictly newer than the local copy.
+      operationId: postGroupMembership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupSnapshot"
+      responses:
+        "202":
+          description: Accepted.
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/groups/sync:
+    post:
+      tags: [groups]
+      summary: Catch up on missed group messages.
+      description: |
+        Bidirectional history sync triggered on every NSD "absent →
+        present" peer transition. The caller sends a list of
+        `(groupId, latestSentAt)` cursors; the responder returns, per
+        group, its current snapshot plus any messages newer than the
+        cursor.
+
+        The responder only includes a group when BOTH the caller and
+        itself are current members. Authenticated by `fromUuid` against
+        the NSD snapshot.
+      operationId: postGroupSync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupSyncRequest"
+      responses:
+        "200":
+          description: Catch-up payload for each shared group.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSyncResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/groups/leave:
+    post:
+      tags: [groups]
+      summary: Notify members that the sender has left a group.
+      description: |
+        Self-removal. The leaver pushes this to every current member they
+        know about; receivers remove the leaver from their local member
+        list. Creator-leave is rejected (creator-leave is not supported
+        in v1).
+      operationId: postGroupLeave
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupLeave"
+      responses:
+        "202":
+          description: Accepted.
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
 components:
   schemas:
     Info:
@@ -397,6 +508,125 @@ components:
             `READ`. Rows still in `SENDING` (in-flight) or `FAILED`
             (terminal error) are left alone — the reader will need to
             send a fresh receipt once the message settles.
+    GroupKind:
+      type: string
+      enum: [CHAT, BROADCAST]
+      description: |
+        `CHAT` — any member may post. `BROADCAST` — only the creator may
+        post; receivers reject inbound messages from non-creators.
+    GroupMember:
+      type: object
+      required: [uuid, nickname]
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+    GroupSnapshot:
+      type: object
+      required: [id, name, kind, creatorUuid, createdAt, membershipUpdatedAt, members]
+      description: |
+        Authoritative description of a group at a point in time. Carried on
+        every group-related request so receivers can auto-create or upgrade
+        their local copy. Receivers only accept membership changes when the
+        snapshot is sent by the [creatorUuid] AND its [membershipUpdatedAt]
+        is strictly newer than the local copy.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          $ref: "#/components/schemas/GroupKind"
+        creatorUuid:
+          type: string
+          format: uuid
+        createdAt:
+          type: integer
+          format: int64
+        membershipUpdatedAt:
+          type: integer
+          format: int64
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupMember"
+    GroupMessage:
+      type: object
+      required: [id, fromUuid, fromNickname, body, sentAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fromUuid:
+          type: string
+          format: uuid
+        fromNickname:
+          type: string
+        body:
+          type: string
+        sentAt:
+          type: integer
+          format: int64
+    GroupMessagePost:
+      type: object
+      required: [snapshot, message]
+      properties:
+        snapshot:
+          $ref: "#/components/schemas/GroupSnapshot"
+        message:
+          $ref: "#/components/schemas/GroupMessage"
+    GroupSyncCursor:
+      type: object
+      required: [groupId, latestSentAt]
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        latestSentAt:
+          type: integer
+          format: int64
+    GroupSyncRequest:
+      type: object
+      required: [fromUuid, cursors]
+      properties:
+        fromUuid:
+          type: string
+          format: uuid
+        cursors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupSyncCursor"
+    GroupSyncPayload:
+      type: object
+      required: [snapshot, messages]
+      properties:
+        snapshot:
+          $ref: "#/components/schemas/GroupSnapshot"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupMessage"
+    GroupSyncResponse:
+      type: object
+      required: [payloads]
+      properties:
+        payloads:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupSyncPayload"
+    GroupLeave:
+      type: object
+      required: [groupId, fromUuid]
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        fromUuid:
+          type: string
+          format: uuid
     Error:
       type: object
       required: [error]
