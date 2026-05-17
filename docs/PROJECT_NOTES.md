@@ -152,6 +152,16 @@ ospchat-android/
   full-screen viewer. Compression now runs on `Dispatchers.IO` inside a
   `try/catch(Throwable)` so OOM / undecodable URIs surface as
   `Result.failure` instead of killing the process.
+- 2026-05-16 — **v0.1.13 (released)**: message reactions. Long-press a
+  chat bubble (own or peer) to open an emoji picker; the selected emoji
+  becomes the user's reaction on that message (one reaction per user
+  per message — a fresh pick replaces the previous one). Chips sit
+  inside the bubble directly under the body, so the bubble grows to
+  contain them; tertiary-container tint for the user's own reactions,
+  neutral surface tone for the rest. Tapping a chip toggles. Room v7
+  adds the `reactions` table with composite PK `(message_id, from_uuid)`
+  via `MIGRATION_6_7`. Wire: `POST /v1/reactions` (`emoji == null` =
+  remove). OpenAPI 0.7.0.
 
 ## Known Limitations
 

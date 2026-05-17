@@ -6,6 +6,8 @@ semantic versioning.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-05-16
+
 ### Added — message reactions
 - Long-pressing a chat bubble (own or peer) opens an emoji picker
   bottom sheet (reusing the AndroidX `EmojiPickerView` we already host
