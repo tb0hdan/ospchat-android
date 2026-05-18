@@ -13,7 +13,7 @@ navigationCompose = "2.8.4"
 hilt = "2.52"
 hiltNavigationCompose = "1.2.0"
 
-room = "2.6.1"
+room = "2.7.0"
 ktor = "2.3.13"
 kotlinxSerialization = "1.7.3"
 slf4j = "1.7.36"
@@ -21,6 +21,7 @@ emoji2 = "1.5.0"
 emoji2Picker = "1.4.0"
 coil = "2.7.0"
 exifInterface = "1.3.7"
+ospchatShared = "0.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -60,6 +61,8 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 slf4j-nop = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
 
 androidx-emoji2-bundled = { group = "androidx.emoji2", name = "emoji2-bundled", version.ref = "emoji2" }
+
+ospchat-shared = { group = "com.ospchat", name = "ospchat-shared", version.ref = "ospchatShared" }
 androidx-emoji2-emojipicker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emoji2Picker" }
 
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }

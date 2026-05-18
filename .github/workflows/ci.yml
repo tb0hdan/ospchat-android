@@ -14,6 +14,9 @@ permissions:
   # `contents: write` is needed for the release-creation step on tag pushes;
   # the verify-only branch / PR builds don't exercise it.
   contents: write
+  # Required so the workflow's GITHUB_TOKEN can pull ospchat-shared from
+  # GitHub Packages — even public packages require an authenticated GET.
+  packages: read
 
 # Cancel previous in-flight runs for the same branch / PR so a quick succession
 # of pushes doesn't queue redundant builds.
@@ -69,9 +72,13 @@ jobs:
       - name: Build debug APK
         # The Makefile defaults to `./gradlew` (`GRADLE ?= ./gradlew`); we
         # override it to use the system Gradle installed above so CI doesn't
-        # need to materialise a wrapper jar.
+        # need to materialise a wrapper jar. GHP credentials are surfaced as
+        # Gradle properties so settings.gradle.kts can authenticate the
+        # ospchat-shared registry lookup.
         env:
           GRADLE: gradle
+          ORG_GRADLE_PROJECT_gprUser: ${{ github.actor }}
+          ORG_GRADLE_PROJECT_gprToken: ${{ secrets.GITHUB_TOKEN }}
         run: make build
 
       - name: Create GitHub Release

@@ -69,6 +69,14 @@ base {
 }
 
 dependencies {
+    // Shared Kotlin Multiplatform module: DTOs, wire protocol, Room data
+    // layer, identity, peer discovery, attachment + avatar stores,
+    // repositories, use cases, MessageClient + MessageServer. Resolved from
+    // the `tb0hdan/ospchat-shared` GitHub Packages Maven repo configured in
+    // settings.gradle.kts. To bump the version, edit `ospchatShared` in
+    // gradle/libs.versions.toml after the corresponding tag is released.
+    implementation(libs.ospchat.shared)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)

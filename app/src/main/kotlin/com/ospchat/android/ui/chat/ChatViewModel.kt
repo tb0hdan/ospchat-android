@@ -1,19 +1,21 @@
 package com.ospchat.android.ui.chat
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ospchat.android.data.identity.IdentityRepository
-import com.ospchat.android.data.messages.Message
-import com.ospchat.android.data.messages.MessageRepository
-import com.ospchat.android.data.peers.PeerRecord
-import com.ospchat.android.data.peers.PeerRepository
-import com.ospchat.android.data.reactions.Reaction
-import com.ospchat.android.data.reactions.ReactionRepository
-import com.ospchat.android.notifications.ActiveChatTracker
 import com.ospchat.android.notifications.MessageNotifier
+import com.ospchat.shared.data.identity.IdentityRepository
+import com.ospchat.shared.data.messages.Message
+import com.ospchat.shared.data.messages.MessageRepository
+import com.ospchat.shared.data.peers.PeerRecord
+import com.ospchat.shared.data.peers.PeerRepository
+import com.ospchat.shared.data.reactions.Reaction
+import com.ospchat.shared.data.reactions.ReactionRepository
+import com.ospchat.shared.notifications.ActiveChatTracker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +30,7 @@ class ChatViewModel
     @Inject
     constructor(
         savedStateHandle: SavedStateHandle,
+        @ApplicationContext private val context: Context,
         private val messageRepository: MessageRepository,
         private val identityRepository: IdentityRepository,
         private val peerRepository: PeerRepository,
@@ -99,7 +102,16 @@ class ChatViewModel
             val target = peer.value ?: return
             if (!target.isOnline) return
             viewModelScope.launch {
-                messageRepository.send(target.toPeer(), trimmed, attachmentUri)
+                // The shared MessageRepository works on ByteArray (multiplatform).
+                // Read the URI bytes here on the Android side; the compressor
+                // inside the shared repo handles the rest (decode + scale + JPEG).
+                val attachmentBytes =
+                    attachmentUri?.let { uri ->
+                        runCatching {
+                            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        }.getOrNull()
+                    }
+                messageRepository.send(target.toPeer(), trimmed, attachmentBytes)
                 _draftAttachment.value = null
             }
         }

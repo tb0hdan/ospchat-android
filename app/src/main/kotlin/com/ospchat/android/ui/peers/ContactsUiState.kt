@@ -1,6 +1,6 @@
 package com.ospchat.android.ui.peers
 
-import com.ospchat.android.data.peers.PeerRecord
+import com.ospchat.shared.data.peers.PeerRecord
 
 /**
  * Top-level state for the Contacts tab. Mirrors the sealed pattern used by

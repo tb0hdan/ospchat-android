@@ -1,9 +1,9 @@
 package com.ospchat.android.ui.groups
 
-import com.ospchat.android.data.groups.GroupKind
-import com.ospchat.android.data.groups.GroupRecord
 import com.ospchat.android.ui.avatar.AvatarModel
 import com.ospchat.android.ui.avatar.computeInitials
+import com.ospchat.shared.data.groups.GroupKind
+import com.ospchat.shared.data.groups.GroupRecord
 
 /**
  * Initials-style avatar derived from the group name. The seed prefix forces

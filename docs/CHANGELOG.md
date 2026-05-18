@@ -6,6 +6,24 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Changed — ospchat-shared from mavenLocal to GitHub Packages
+- `tb0hdan/ospchat-shared` is now released (tag `v0.1.0`) and published to
+  the GitHub Packages Maven registry. The Android build pulls it from
+  `https://maven.pkg.github.com/tb0hdan/ospchat-shared` instead of
+  `mavenLocal()`, removing the manual `gradle publishToMavenLocal`
+  bootstrap step.
+- `settings.gradle.kts` adds the registry and reads credentials from the
+  `gprUser` / `gprToken` Gradle properties (fallback: `GITHUB_ACTOR` /
+  `GITHUB_TOKEN`). Even public GitHub Packages require an authenticated
+  `GET`, so each developer must set a Personal Access Token with
+  `read:packages` once — documented in the README.
+- `gradle/libs.versions.toml` hoists the version into the `[versions]`
+  block as `ospchatShared = "0.1.0"` so future bumps are a one-line edit.
+- `.github/workflows/ci.yml` requests `packages: read` and surfaces the
+  workflow's built-in `GITHUB_TOKEN` to Gradle as `ORG_GRADLE_PROJECT_*`
+  env vars so CI authenticates against the registry without extra
+  secrets.
+
 ### Added — contacts + foldable peer list
 - The Contacts tab is now organized into two foldable sections:
   **Contacts** (peers the user has explicitly saved, online or offline)

@@ -2,7 +2,7 @@ package com.ospchat.android.ui.nickname
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ospchat.android.data.identity.IdentityRepository
+import com.ospchat.shared.data.identity.IdentityRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject

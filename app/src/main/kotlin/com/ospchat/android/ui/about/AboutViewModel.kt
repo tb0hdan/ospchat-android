@@ -5,11 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ospchat.android.data.avatar.AvatarRepository
-import com.ospchat.android.data.avatar.AvatarStore
-import com.ospchat.android.data.identity.IdentityRepository
 import com.ospchat.android.service.DiscoveryForegroundService
 import com.ospchat.android.ui.avatar.AvatarModel
 import com.ospchat.android.ui.avatar.computeInitials
+import com.ospchat.shared.data.avatar.AvatarStore
+import com.ospchat.shared.data.identity.IdentityRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
@@ -47,7 +47,7 @@ class AboutViewModel
                 if (nick == null || uuid == null) {
                     null
                 } else if (hash != null) {
-                    AvatarModel.Custom(avatarStore.selfFile(hash).absolutePath)
+                    AvatarModel.Custom(avatarStore.selfPath(hash))
                 } else {
                     AvatarModel.Initials(letters = computeInitials(nick), seed = uuid)
                 }

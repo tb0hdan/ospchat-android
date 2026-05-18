@@ -187,6 +187,12 @@ ospchat-android/
   "Exit OSPChat" button with a confirmation dialog. Both routes
   funnel through `MainActivity.ACTION_EXIT`, which stops
   `DiscoveryForegroundService` and calls `finishAndRemoveTask()`.
+- 2026-05-18 — **unreleased**: `ospchat-shared` is now consumed from
+  the GitHub Packages Maven registry (`tb0hdan/ospchat-shared` tag
+  `v0.1.0`) rather than `mavenLocal()`. Local developers and CI must
+  authenticate with a token carrying `read:packages` — see the README
+  for the one-time setup. Version pinned in
+  `gradle/libs.versions.toml` under `ospchatShared`.
 - 2026-05-17 — **unreleased**: group chats + broadcast channels.
   Groups tab now has two foldable sections (Group chats / Broadcast
   channels). FAB → new-group sheet. Long-press menu offers

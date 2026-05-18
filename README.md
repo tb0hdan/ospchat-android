@@ -126,6 +126,23 @@ The build also expects a `local.properties` pointing at your SDK root:
 sdk.dir=/path/to/Android/Sdk
 ```
 
+### One-time GitHub Packages credentials
+
+The shared Kotlin module [`ospchat-shared`](https://github.com/tb0hdan/ospchat-shared)
+is consumed from the GitHub Packages Maven registry. Even for public
+packages GitHub requires an authenticated `GET`, so before the first
+build add a [Personal Access Token](https://github.com/settings/tokens)
+with the **`read:packages`** scope to your user-level
+`~/.gradle/gradle.properties`:
+
+```properties
+gprUser=your-github-username
+gprToken=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Alternatively export `GITHUB_ACTOR` and `GITHUB_TOKEN` in your shell —
+the build reads either source.
+
 ### One-time Gradle wrapper
 
 The Gradle wrapper JAR is **not committed** to this repo. Generate it once

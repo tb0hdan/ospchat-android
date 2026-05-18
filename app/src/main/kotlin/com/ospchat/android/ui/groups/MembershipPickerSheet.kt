@@ -100,7 +100,7 @@ fun MembershipPickerSheet(
 
 /**
  * Lightweight candidate model so this picker can be fed by both contact
- * rows and member entities without forcing a [PeerRecord][com.ospchat.android.data.peers.PeerRecord]
+ * rows and member entities without forcing a [PeerRecord][com.ospchat.shared.data.peers.PeerRecord]
  * shape.
  */
 data class MembershipCandidate(

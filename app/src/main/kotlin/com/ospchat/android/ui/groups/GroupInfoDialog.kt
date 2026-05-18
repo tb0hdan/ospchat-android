@@ -22,9 +22,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ospchat.android.R
-import com.ospchat.android.data.groups.GroupInfo
-import com.ospchat.android.data.groups.GroupKind
 import com.ospchat.android.ui.avatar.Avatar
+import com.ospchat.shared.data.groups.GroupInfo
+import com.ospchat.shared.data.groups.GroupKind
 
 @Composable
 fun GroupInfoDialog(

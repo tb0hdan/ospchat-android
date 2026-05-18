@@ -2,10 +2,10 @@ package com.ospchat.android.ui.peers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ospchat.android.data.peers.PeerInfo
-import com.ospchat.android.data.peers.PeerRepository
-import com.ospchat.android.domain.contacts.AddToContactsUseCase
-import com.ospchat.android.domain.contacts.RemoveFromContactsUseCase
+import com.ospchat.shared.data.peers.PeerInfo
+import com.ospchat.shared.data.peers.PeerRepository
+import com.ospchat.shared.domain.contacts.AddToContactsUseCase
+import com.ospchat.shared.domain.contacts.RemoveFromContactsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow

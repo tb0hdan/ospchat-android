@@ -26,9 +26,9 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ospchat.android.R
-import com.ospchat.android.data.groups.GroupKind
-import com.ospchat.android.data.groups.GroupRecord
 import com.ospchat.android.ui.avatar.Avatar
+import com.ospchat.shared.data.groups.GroupKind
+import com.ospchat.shared.data.groups.GroupRecord
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

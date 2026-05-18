@@ -24,11 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.ospchat.android.R
-import com.ospchat.android.data.groups.GroupRecord
-import com.ospchat.android.data.peers.PeerRecord
 import com.ospchat.android.ui.about.AboutScreen
 import com.ospchat.android.ui.groups.GroupsScreen
 import com.ospchat.android.ui.peers.PeersScreen
+import com.ospchat.shared.data.groups.GroupRecord
+import com.ospchat.shared.data.peers.PeerRecord
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

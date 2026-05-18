@@ -8,7 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.ospchat.android.data.peers.PeerRecord
+import com.ospchat.shared.data.peers.PeerRecord
 
 /**
  * Renders one foldable section (header + rows) into the parent `LazyColumn`.

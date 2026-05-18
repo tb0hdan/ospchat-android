@@ -81,13 +81,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.ospchat.android.data.messages.Attachment
-import com.ospchat.android.data.messages.Message
-import com.ospchat.android.data.peers.PeerRecord
-import com.ospchat.android.data.reactions.Reaction
 import com.ospchat.android.ui.avatar.Avatar
 import com.ospchat.android.ui.avatar.AvatarModel
 import com.ospchat.android.ui.avatar.computeInitials
+import com.ospchat.shared.data.messages.Attachment
+import com.ospchat.shared.data.messages.Message
+import com.ospchat.shared.data.peers.PeerRecord
+import com.ospchat.shared.data.reactions.Reaction
 import kotlinx.coroutines.delay
 import java.io.File
 import java.text.DateFormat
@@ -520,12 +520,13 @@ private fun AttachmentImage(
             .fillMaxWidth()
             .aspectRatio(aspect.coerceIn(0.5f, 2.5f))
             .clip(shape)
-    if (attachment.localPath != null) {
+    val localPath = attachment.localPath
+    if (localPath != null) {
         AsyncImage(
-            model = File(attachment.localPath),
+            model = File(localPath),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = baseModifier.clickable { onTap(attachment.localPath) },
+            modifier = baseModifier.clickable { onTap(localPath) },
         )
     } else {
         Box(
@@ -715,9 +716,11 @@ private fun StatusDot(isOnline: Boolean) {
     )
 }
 
-private fun PeerRecord.toAvatarModel(): AvatarModel =
-    if (avatarLocalPath != null) {
-        AvatarModel.Custom(avatarLocalPath)
+private fun PeerRecord.toAvatarModel(): AvatarModel {
+    val path = avatarLocalPath
+    return if (path != null) {
+        AvatarModel.Custom(path)
     } else {
         AvatarModel.Initials(letters = computeInitials(nickname), seed = uuid)
     }
+}

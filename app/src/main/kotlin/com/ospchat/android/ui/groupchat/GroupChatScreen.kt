@@ -52,11 +52,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ospchat.android.R
-import com.ospchat.android.data.groups.GroupKind
-import com.ospchat.android.data.groups.GroupMessage
 import com.ospchat.android.ui.avatar.Avatar
 import com.ospchat.android.ui.groups.GroupInfoDialog
 import com.ospchat.android.ui.groups.toAvatarModel
+import com.ospchat.shared.data.groups.GroupKind
+import com.ospchat.shared.data.groups.GroupMessage
 import java.text.DateFormat
 import java.util.Date
 

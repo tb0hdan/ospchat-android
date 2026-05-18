@@ -32,8 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ospchat.android.R
-import com.ospchat.android.data.groups.GroupKind
-import com.ospchat.android.data.peers.PeerRecord
+import com.ospchat.shared.data.groups.GroupKind
+import com.ospchat.shared.data.peers.PeerRecord
 
 private const val MAX_NAME_LEN = 60
 

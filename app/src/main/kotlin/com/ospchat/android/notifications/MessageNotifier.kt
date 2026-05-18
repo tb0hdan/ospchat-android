@@ -14,13 +14,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.ospchat.android.MainActivity
 import com.ospchat.android.R
-import com.ospchat.android.data.discovery.Peer
-import com.ospchat.android.data.groups.GroupEntity
-import com.ospchat.android.data.groups.GroupMessage
-import com.ospchat.android.data.messages.Message
+import com.ospchat.shared.data.discovery.Peer
+import com.ospchat.shared.data.groups.GroupEntity
+import com.ospchat.shared.data.groups.GroupMessage
+import com.ospchat.shared.data.messages.Message
+import com.ospchat.shared.notifications.ActiveChatTracker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.ospchat.shared.notifications.MessageNotifier as SharedMessageNotifier
 
 @Singleton
 class MessageNotifier
@@ -28,7 +30,7 @@ class MessageNotifier
     constructor(
         @ApplicationContext private val context: Context,
         private val activeChatTracker: ActiveChatTracker,
-    ) {
+    ) : SharedMessageNotifier {
         private val notificationManager: NotificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -43,10 +45,11 @@ class MessageNotifier
          *     than rely on channel filtering).
          *   - The `POST_NOTIFICATIONS` runtime permission is denied on API 33+.
          */
-        fun notifyIncoming(
-            peer: Peer,
+        override fun notifyIncoming(
+            fromPeer: Peer,
             message: Message,
         ) {
+            val peer = fromPeer
             if (activeChatTracker.activePeerUuid == peer.uuid) return
             if (notificationManager.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) return
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -85,7 +88,7 @@ class MessageNotifier
          * notification title is the group name; the body is
          * `nickname: text`. Tap deep-links via `ospchat://group/{groupId}`.
          */
-        fun notifyIncomingGroup(
+        override fun notifyIncomingGroup(
             group: GroupEntity,
             message: GroupMessage,
         ) {

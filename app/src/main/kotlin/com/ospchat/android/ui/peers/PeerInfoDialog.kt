@@ -22,8 +22,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.ospchat.android.R
-import com.ospchat.android.data.peers.PeerInfo
 import com.ospchat.android.ui.avatar.Avatar
+import com.ospchat.shared.data.peers.PeerInfo
 
 /**
  * Material 3 [AlertDialog] showing the full Info bundle for one peer:

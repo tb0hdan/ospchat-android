@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ospchat.android.R
-import com.ospchat.android.data.groups.GroupRecord
+import com.ospchat.shared.data.groups.GroupRecord
 
 @Composable
 fun GroupsScreen(

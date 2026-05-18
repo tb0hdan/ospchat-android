@@ -43,11 +43,11 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ospchat.android.R
-import com.ospchat.android.data.peers.PeerRecord
 import com.ospchat.android.service.DiscoveryForegroundService
 import com.ospchat.android.ui.avatar.Avatar
 import com.ospchat.android.ui.avatar.AvatarModel
 import com.ospchat.android.ui.avatar.computeInitials
+import com.ospchat.shared.data.peers.PeerRecord
 
 @Composable
 fun PeersScreen(
@@ -225,12 +225,14 @@ private fun UnreadIndicator(count: Int) {
     }
 }
 
-internal fun PeerRecord.toAvatarModel(): AvatarModel =
-    if (avatarLocalPath != null) {
-        AvatarModel.Custom(avatarLocalPath)
+internal fun PeerRecord.toAvatarModel(): AvatarModel {
+    val path = avatarLocalPath
+    return if (path != null) {
+        AvatarModel.Custom(path)
     } else {
         AvatarModel.Initials(letters = computeInitials(nickname), seed = uuid)
     }
+}
 
 @Composable
 private fun StatusDot(isOnline: Boolean) {

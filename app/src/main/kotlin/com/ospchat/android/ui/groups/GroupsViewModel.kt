@@ -2,15 +2,15 @@ package com.ospchat.android.ui.groups
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ospchat.android.data.groups.GroupInfo
-import com.ospchat.android.data.groups.GroupKind
-import com.ospchat.android.data.groups.GroupRepository
-import com.ospchat.android.data.peers.PeerRecord
-import com.ospchat.android.data.peers.PeerRepository
-import com.ospchat.android.domain.groups.AddGroupMembersUseCase
-import com.ospchat.android.domain.groups.CreateGroupUseCase
-import com.ospchat.android.domain.groups.LeaveGroupUseCase
-import com.ospchat.android.domain.groups.RemoveGroupMembersUseCase
+import com.ospchat.shared.data.groups.GroupInfo
+import com.ospchat.shared.data.groups.GroupKind
+import com.ospchat.shared.data.groups.GroupRepository
+import com.ospchat.shared.data.peers.PeerRecord
+import com.ospchat.shared.data.peers.PeerRepository
+import com.ospchat.shared.domain.groups.AddGroupMembersUseCase
+import com.ospchat.shared.domain.groups.CreateGroupUseCase
+import com.ospchat.shared.domain.groups.LeaveGroupUseCase
+import com.ospchat.shared.domain.groups.RemoveGroupMembersUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow

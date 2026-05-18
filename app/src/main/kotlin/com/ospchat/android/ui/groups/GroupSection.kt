@@ -8,8 +8,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.ospchat.android.data.groups.GroupRecord
 import com.ospchat.android.ui.peers.ContactSectionHeader
+import com.ospchat.shared.data.groups.GroupRecord
 
 /**
  * Foldable group section, structurally identical to
