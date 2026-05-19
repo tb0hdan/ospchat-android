@@ -193,6 +193,21 @@ ospchat-android/
   authenticate with a token carrying `read:packages` — see the README
   for the one-time setup. Version pinned in
   `gradle/libs.versions.toml` under `ospchatShared`.
+- 2026-05-19 — **unreleased**: followup to the port-stability fix.
+  `ospchat-shared:0.1.1` introduced a peer-list flicker regression
+  caused by `MessageClient` invoking `DiscoveryRepository.forgetPeer`
+  on TCP connect failures, where Android's `NsdPeerDiscovery.forgetPeer`
+  bounced the whole NSD discovery — `onServiceLost` for every peer,
+  then `onServiceFound` for every peer, then `DiscoveryForegroundService.peerSyncJob`
+  re-firing `PeerAvatarSync` + `GroupSyncer` on each "newly arrived"
+  peer, with any failed background call restarting the cycle. Fixed
+  in `ospchat-shared:0.1.2`: `forgetPeer` is now surgical (only
+  re-resolves the targeted peer via the existing resolve queue —
+  no `stopServiceDiscovery`), and `MessageClient` per-method takes a
+  `rediscover` flag that all background callers pass as `false`
+  (avatar sync, group sync, info refresh, attachment download). The
+  original port-restart symmetry — user-initiated sends still
+  rediscover on connect failure — is preserved.
 - 2026-05-19 — **unreleased**: fixed one-way messaging after the peer's
   desktop app restarts. Symptom: desktop restart picks a new ephemeral
   port; Android NSD doesn't surface port-only changes for an existing

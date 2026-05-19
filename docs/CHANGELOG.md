@@ -6,6 +6,33 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Fixed — peer-list flicker regression in `ospchat-shared:0.1.1` (fixed in 0.1.2)
+- 0.1.1 introduced `MessageClient` → `DiscoveryRepository.forgetPeer` on
+  TCP connect failures. The Android NSD implementation bounced the entire
+  service discovery, which fires `onServiceLost` for every peer (not just
+  the targeted one), empties `_peers`, and then re-emits `onServiceFound`
+  for each. `DiscoveryForegroundService.peerSyncJob` reads
+  `(current - previous)` and fires `PeerAvatarSync.sync` +
+  `GroupSyncer.sync` for every peer that "newly appeared" — so one
+  failed background call would cycle the entire peer list and fan out
+  N×2 fresh HTTP requests, any of which could fail and start the loop
+  over. Symptom: peers blinking on/off several times per second.
+- 0.1.2 ships two fixes in `ospchat-shared`:
+  - `NsdPeerDiscovery.forgetPeer` is now surgical — drops the entry
+    from `_peers` + `nameToUuid` and feeds a stub `NsdServiceInfo`
+    (name + type) through the existing resolve queue, so only the
+    targeted peer is re-resolved. No `stopServiceDiscovery`, no global
+    snapshot churn.
+  - `MessageClient` methods now take `rediscover: Boolean = true`;
+    `PeerAvatarSync` (`/v1/info`, `/v1/avatar`), `GroupSyncer`
+    (`/v1/groups/sync`), `PeerInfoNotifier`
+    (`/v1/notify-refresh`), and `MessageRepository.downloadAttachment`
+    (`/v1/attachments/{id}`) all pass `false`. These flows already
+    have their own retry/backoff and must not invalidate the
+    discovery snapshot on failure. User-initiated sends keep the
+    default `true` so the original "peer restarted on a new port" bug
+    stays fixed.
+
 ### Fixed — one-way messaging after the peer's desktop app restarts
 - Restarting the desktop OSPChat app picked a fresh ephemeral port, but
   Android's NSD framework didn't re-fire `onServiceFound` for the
