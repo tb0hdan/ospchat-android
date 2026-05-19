@@ -6,6 +6,24 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Fixed — one-way messaging after the peer's desktop app restarts
+- Restarting the desktop OSPChat app picked a fresh ephemeral port, but
+  Android's NSD framework didn't re-fire `onServiceFound` for the
+  port-only change, so its cached resolution kept pointing at the dead
+  port. Android→Desktop sends silently failed until Android was nudged
+  into re-resolving (toggling Wi-Fi, restarting the app, etc.).
+- Now Android also persists the embedded server's bound port via
+  `IdentityRepository.lastServerPort` and re-binds it on the next boot
+  (falls back to ephemeral on `EADDRINUSE`) so its peers stay reachable
+  through an Android restart too.
+- `MessageClient` now wraps every per-peer call in a one-shot
+  rediscover-and-retry. On a TCP connect failure it calls
+  `DiscoveryRepository.forgetPeer(uuid)` (which drops the peer from the
+  live snapshot and restarts NSD discovery to force a fresh resolve),
+  waits up to 3 s for a fresh resolution whose host:port differs from
+  the failed address, then retries once. Application-level rejections
+  (HTTP non-2xx) are not retried.
+
 ### Changed — ospchat-shared from mavenLocal to GitHub Packages
 - `tb0hdan/ospchat-shared` is now released (tag `v0.1.0`) and published to
   the GitHub Packages Maven registry. The Android build pulls it from

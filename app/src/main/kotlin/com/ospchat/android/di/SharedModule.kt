@@ -110,7 +110,10 @@ object SharedModule {
 
     @Provides
     @Singleton
-    fun provideMessageClient(http: HttpClient): MessageClient = MessageClient(http)
+    fun provideMessageClient(
+        http: HttpClient,
+        discoveryRepository: DiscoveryRepository,
+    ): MessageClient = MessageClient(http = http, discoveryRepository = discoveryRepository)
 
     // ---- Misc shared --------------------------------------------------------
 

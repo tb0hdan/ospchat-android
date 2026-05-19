@@ -101,7 +101,15 @@ class DiscoveryForegroundService : Service() {
                 }
                 val uuid = identityRepository.ensureUuid()
                 try {
-                    val port = messageServer.start(uuid = uuid, nickname = nickname)
+                    val preferredPort = identityRepository.lastServerPort() ?: 0
+                    val port =
+                        messageServer.start(
+                            uuid = uuid,
+                            nickname = nickname,
+                            preferredPort = preferredPort,
+                        )
+                    runCatching { identityRepository.setLastServerPort(port) }
+                        .onFailure { Log.w(TAG, "setLastServerPort($port) failed", it) }
                     discoveryRepository.start(
                         nickname = nickname,
                         uuid = uuid,

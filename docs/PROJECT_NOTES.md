@@ -193,6 +193,25 @@ ospchat-android/
   authenticate with a token carrying `read:packages` — see the README
   for the one-time setup. Version pinned in
   `gradle/libs.versions.toml` under `ospchatShared`.
+- 2026-05-19 — **unreleased**: fixed one-way messaging after the peer's
+  desktop app restarts. Symptom: desktop restart picks a new ephemeral
+  port; Android NSD doesn't surface port-only changes for an existing
+  service name (no `onServiceFound` / `onServiceLost` fires), so the
+  framework's cached resolution kept addressing the dead port and
+  Android→Desktop POSTs silently failed. Fixes (in `ospchat-shared`):
+  (a) `IdentityRepository.lastServerPort` persists the embedded
+  server's bound port; `DiscoveryForegroundService` reads it on boot
+  and passes `preferredPort` to `MessageServer.start`, which tries
+  that port first and falls back to ephemeral on `EADDRINUSE`. Means
+  an Android restart also keeps its port stable across reboots.
+  (b) `MessageClient` wraps every per-peer call in a one-shot
+  rediscover-and-retry: on a TCP connect failure it calls
+  `DiscoveryRepository.forgetPeer(uuid)` (the Android implementation
+  drops the peer from `_peers` + `nameToUuid` and bounces
+  `nsdManager.stopServiceDiscovery` → `discoverServices` to force the
+  framework to re-emit `onServiceFound` for every peer), waits ≤3 s
+  for a snapshot entry with a different host:port, then retries. No
+  OpenAPI changes (wire compatible).
 - 2026-05-17 — **unreleased**: group chats + broadcast channels.
   Groups tab now has two foldable sections (Group chats / Broadcast
   channels). FAB → new-group sheet. Long-press menu offers
