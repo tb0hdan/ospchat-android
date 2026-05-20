@@ -167,7 +167,18 @@ object SharedModule {
         dao: ReactionDao,
         client: MessageClient,
         identityRepository: IdentityRepository,
-    ): ReactionRepository = ReactionRepository(dao = dao, client = client, identityRepository = identityRepository)
+        groupDao: GroupDao,
+        peerDao: PeerDao,
+        discoveryRepository: DiscoveryRepository,
+    ): ReactionRepository =
+        ReactionRepository(
+            dao = dao,
+            client = client,
+            identityRepository = identityRepository,
+            groupDao = groupDao,
+            peerDao = peerDao,
+            discoveryRepository = discoveryRepository,
+        )
 
     @Provides
     @Singleton
@@ -238,6 +249,7 @@ object SharedModule {
         groupRepository: GroupRepository,
         client: MessageClient,
         identityRepository: IdentityRepository,
+        reactionRepository: ReactionRepository,
     ): GroupSyncer =
         GroupSyncer(
             groupDao = groupDao,
@@ -245,6 +257,7 @@ object SharedModule {
             groupRepository = groupRepository,
             client = client,
             identityRepository = identityRepository,
+            reactionRepository = reactionRepository,
         )
 
     @Provides

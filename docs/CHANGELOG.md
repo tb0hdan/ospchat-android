@@ -6,6 +6,25 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Added — reactions on group messages
+
+- Long-press a group bubble (own or peer's) to open the emoji picker; the
+  selected emoji becomes the user's reaction on that message. Chips render
+  inside the bubble under the body.
+- Chip display rule:
+  - 1 or 2 reacters with the same emoji → tiny initials avatars
+    (oldest-first by `reactedAt`).
+  - 3+ → numeric count.
+- Tapping a chip toggles: if it carries your own reaction it's removed;
+  otherwise it's added (matches DM semantics). Self-tinted with
+  `tertiaryContainer`, others neutral.
+- Storage reuses the existing `reactions` Room table (no migration —
+  `(messageId, fromUuid)` PK works for group messages too).
+- Delivery is mesh fan-out to every other current group member; offline
+  members catch up via the extended `GroupSyncer` payload.
+- Wire: `POST /v1/reactions` gains a nullable `groupId`. When set, the
+  receiver validates the sender against group membership. OpenAPI 0.9.0.
+
 ### Fixed — peer-list flicker regression in `ospchat-shared:0.1.1` (fixed in 0.1.2)
 - 0.1.1 introduced `MessageClient` → `DiscoveryRepository.forgetPeer` on
   TCP connect failures. The Android NSD implementation bounced the entire

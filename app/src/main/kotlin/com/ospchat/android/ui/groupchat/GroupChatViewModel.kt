@@ -11,6 +11,8 @@ import com.ospchat.shared.data.groups.GroupMessageRepository
 import com.ospchat.shared.data.groups.GroupRecord
 import com.ospchat.shared.data.groups.GroupRepository
 import com.ospchat.shared.data.identity.IdentityRepository
+import com.ospchat.shared.data.reactions.Reaction
+import com.ospchat.shared.data.reactions.ReactionRepository
 import com.ospchat.shared.domain.groups.LeaveGroupUseCase
 import com.ospchat.shared.notifications.ActiveChatTracker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -34,6 +37,7 @@ class GroupChatViewModel
         private val groupRepository: GroupRepository,
         private val groupMessageRepository: GroupMessageRepository,
         private val identityRepository: IdentityRepository,
+        private val reactionRepository: ReactionRepository,
         private val leaveGroup: LeaveGroupUseCase,
         private val activeChatTracker: ActiveChatTracker,
         private val notifier: MessageNotifier,
@@ -52,6 +56,13 @@ class GroupChatViewModel
             groupMessageRepository
                 .messagesFor(groupId)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        /** All reactions on every message in this group, grouped by message id. */
+        val reactionsByMessage: StateFlow<Map<String, List<Reaction>>> =
+            reactionRepository
+                .reactionsForGroup(groupId)
+                .map { reactions -> reactions.groupBy { it.messageId } }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
         private val _selfUuid = MutableStateFlow("")
         val selfUuid: StateFlow<String> = _selfUuid.asStateFlow()
@@ -86,6 +97,25 @@ class GroupChatViewModel
             if (trimmed.isEmpty()) return
             viewModelScope.launch {
                 groupMessageRepository.send(groupId, trimmed)
+            }
+        }
+
+        /**
+         * Set or clear the local user's reaction on [messageId]. `null`
+         * removes; a non-null emoji upserts (replacing any previous reaction
+         * from the same user on the same message). Fans out to every other
+         * current group member.
+         */
+        fun react(
+            messageId: String,
+            emoji: String?,
+        ) {
+            viewModelScope.launch {
+                reactionRepository.reactToGroup(
+                    groupId = groupId,
+                    messageId = messageId,
+                    emoji = emoji,
+                )
             }
         }
 

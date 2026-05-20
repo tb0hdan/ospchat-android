@@ -1,15 +1,20 @@
 package com.ospchat.android.ui.groupchat
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -28,12 +33,17 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -46,6 +56,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -53,10 +65,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ospchat.android.R
 import com.ospchat.android.ui.avatar.Avatar
+import com.ospchat.android.ui.avatar.AvatarModel
+import com.ospchat.android.ui.avatar.computeInitials
 import com.ospchat.android.ui.groups.GroupInfoDialog
 import com.ospchat.android.ui.groups.toAvatarModel
 import com.ospchat.shared.data.groups.GroupKind
 import com.ospchat.shared.data.groups.GroupMessage
+import com.ospchat.shared.data.reactions.Reaction
 import java.text.DateFormat
 import java.util.Date
 
@@ -68,12 +83,15 @@ fun GroupChatScreen(
 ) {
     val group by viewModel.group.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
+    val reactionsByMessage by viewModel.reactionsByMessage.collectAsStateWithLifecycle()
     val selfUuid by viewModel.selfUuid.collectAsStateWithLifecycle()
     val canPost by viewModel.canPost.collectAsStateWithLifecycle()
     val groupInfo by viewModel.groupInfo.collectAsStateWithLifecycle()
     val infoDialogVisible by viewModel.infoDialogVisible.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    var reactingTo by remember { mutableStateOf<GroupMessage?>(null) }
+    val reactionSheetState = rememberModalBottomSheetState()
 
     val atBottom by remember {
         derivedStateOf {
@@ -196,9 +214,18 @@ fun GroupChatScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 items(messages, key = { it.id }) { message ->
+                    val msgReactions = reactionsByMessage[message.id].orEmpty()
                     GroupMessageBubble(
                         message = message,
                         isSelf = selfUuid.isNotEmpty() && message.fromUuid == selfUuid,
+                        reactions = msgReactions,
+                        selfUuid = selfUuid,
+                        onLongPress = { reactingTo = message },
+                        onChipTap = { emoji ->
+                            val mine = msgReactions.firstOrNull { it.fromUuid == selfUuid }
+                            val next = if (mine?.emoji == emoji) null else emoji
+                            viewModel.react(message.id, next)
+                        },
                     )
                 }
             }
@@ -235,12 +262,39 @@ fun GroupChatScreen(
             GroupInfoDialog(info = info, onDismiss = viewModel::dismissInfo)
         }
     }
+
+    reactingTo?.let { msg ->
+        ModalBottomSheet(
+            onDismissRequest = { reactingTo = null },
+            sheetState = reactionSheetState,
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    EmojiPickerView(ctx).apply {
+                        setOnEmojiPickedListener { picked ->
+                            viewModel.react(msg.id, picked.emoji)
+                            reactingTo = null
+                        }
+                    }
+                },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 320.dp, max = 480.dp),
+            )
+        }
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun GroupMessageBubble(
     message: GroupMessage,
     isSelf: Boolean,
+    reactions: List<Reaction>,
+    selfUuid: String,
+    onLongPress: () -> Unit,
+    onChipTap: (String) -> Unit,
 ) {
     val align = if (isSelf) Alignment.End else Alignment.Start
     val container =
@@ -256,7 +310,13 @@ private fun GroupMessageBubble(
             MaterialTheme.colorScheme.onSurfaceVariant
         }
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = onLongPress,
+                ),
         horizontalAlignment = align,
     ) {
         Column(
@@ -280,6 +340,14 @@ private fun GroupMessageBubble(
                 color = onContainer,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
             )
+            if (reactions.isNotEmpty()) {
+                GroupReactionRow(
+                    reactions = reactions,
+                    selfUuid = selfUuid,
+                    isSelfBubble = isSelf,
+                    onChipTap = onChipTap,
+                )
+            }
         }
         Row(
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -307,6 +375,79 @@ private fun GroupMessageBubble(
                         }
                     }
                 Text(text = text, style = MaterialTheme.typography.labelSmall, color = color)
+            }
+        }
+    }
+}
+
+/**
+ * Same-emoji reaction chips on a group bubble. Per spec:
+ *  - 1 or 2 reacters with the same emoji → render tiny initials avatars
+ *    (oldest-first) instead of a count.
+ *  - 3+ → numeric count.
+ *
+ * Clicking toggles the local user's reaction on that emoji.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GroupReactionRow(
+    reactions: List<Reaction>,
+    selfUuid: String,
+    isSelfBubble: Boolean,
+    onChipTap: (String) -> Unit,
+) {
+    val grouped =
+        reactions
+            .groupBy { it.emoji }
+            .mapValues { (_, list) -> list.sortedBy { it.reactedAt } }
+    val highlight = MaterialTheme.colorScheme.tertiaryContainer
+    val onHighlight = MaterialTheme.colorScheme.onTertiaryContainer
+    val neutral =
+        if (isSelfBubble) {
+            MaterialTheme.colorScheme.surface
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        }
+    val onNeutral = MaterialTheme.colorScheme.onSurface
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        FlowRow {
+            grouped.forEach { (emoji, sorted) ->
+                val mine = selfUuid.isNotEmpty() && sorted.any { it.fromUuid == selfUuid }
+                val containerColor = if (mine) highlight else neutral
+                val contentColor = if (mine) onHighlight else onNeutral
+                Surface(
+                    color = containerColor,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.padding(end = 4.dp),
+                    onClick = { onChipTap(emoji) },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(text = emoji, style = MaterialTheme.typography.labelMedium)
+                        if (sorted.size <= 2) {
+                            sorted.forEach { r ->
+                                Spacer(modifier = Modifier.size(4.dp))
+                                Avatar(
+                                    model =
+                                        AvatarModel.Initials(
+                                            letters = computeInitials(r.fromNickname),
+                                            seed = r.fromUuid,
+                                        ),
+                                    size = 16.dp,
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(
+                                text = sorted.size.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = contentColor,
+                            )
+                        }
+                    }
+                }
             }
         }
     }

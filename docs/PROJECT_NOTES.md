@@ -227,6 +227,21 @@ ospchat-android/
   framework to re-emit `onServiceFound` for every peer), waits ≤3 s
   for a snapshot entry with a different host:port, then retries. No
   OpenAPI changes (wire compatible).
+- 2026-05-20 — **unreleased**: group chat reactions. Long-press a group
+  bubble (own or peer's) opens the emoji picker; the picked emoji
+  becomes the user's reaction on that message. Chips render inside the
+  bubble under the body. Display rule per spec: 1–2 reacters with the
+  same emoji → tiny initials avatars (16 dp, oldest-first by
+  `reactedAt`); 3+ → numeric count. Tap toggles (matches DM semantics).
+  Reuses the existing `reactions` Room table — no migration needed.
+  New DAO query `ReactionDao.observeForGroup(groupId)` joins through
+  `group_messages.group_id`. Mesh fan-out via the shared
+  `ReactionRepository.reactToGroup(...)`. Wire:
+  `POST /v1/reactions` gains a nullable `groupId`; receivers validate
+  the sender against group membership when set. Catch-up: extended
+  `GroupSyncPayloadDto.reactions` carries every current reaction in the
+  group; `GroupSyncer` packs in `buildResponse` and upserts in
+  `applyPayload`. OpenAPI 0.9.0.
 - 2026-05-17 — **unreleased**: group chats + broadcast channels.
   Groups tab now has two foldable sections (Group chats / Broadcast
   channels). FAB → new-group sheet. Long-press menu offers
