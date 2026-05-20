@@ -7,7 +7,9 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!--
         Android 11+ app-visibility: declare the camera intent we delegate to
@@ -53,6 +55,18 @@
             android:name=".service.DiscoveryForegroundService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!--
+            Separate foreground service that owns the mic for the duration of
+            a voice call. Started when a call enters CONNECTING and stopped
+            on ENDED; uses the `microphone` FG service type required on
+            Android 14+ to continue capturing audio when the screen sleeps
+            or the activity is backgrounded.
+        -->
+        <service
+            android:name=".service.CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

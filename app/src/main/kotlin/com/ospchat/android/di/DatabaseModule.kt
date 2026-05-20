@@ -1,6 +1,7 @@
 package com.ospchat.android.di
 
 import android.content.Context
+import com.ospchat.shared.data.calls.CallDao
 import com.ospchat.shared.data.db.OspChatDatabase
 import com.ospchat.shared.data.db.ospChatDatabase
 import com.ospchat.shared.data.groups.GroupDao
@@ -48,4 +49,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideGroupMessageDao(database: OspChatDatabase): GroupMessageDao = database.groupMessageDao()
+
+    @Provides
+    @Singleton
+    fun provideCallDao(database: OspChatDatabase): CallDao = database.callDao()
 }

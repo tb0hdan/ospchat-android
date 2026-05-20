@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -98,6 +99,7 @@ import java.util.UUID
 @Composable
 fun ChatScreen(
     onBack: () -> Unit,
+    onCallStarted: (callId: String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val peer by viewModel.peer.collectAsStateWithLifecycle()
@@ -125,6 +127,26 @@ fun ChatScreen(
             if (success) pendingCaptureUri?.let { viewModel.attachImage(it) }
             pendingCaptureUri = null
         }
+
+    val recordAudioLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            if (granted) viewModel.startCall(onCallStarted)
+        }
+
+    fun launchCallOrRequestPermission() {
+        val granted =
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.RECORD_AUDIO,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            viewModel.startCall(onCallStarted)
+        } else {
+            recordAudioLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     fun launchCamera() {
         val captureDir = java.io.File(context.cacheDir, "captures").apply { mkdirs() }
@@ -219,6 +241,12 @@ fun ChatScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { launchCallOrRequestPermission() },
+                        enabled = peer?.isOnline == true,
+                    ) {
+                        Icon(Icons.Filled.Call, contentDescription = "Voice call")
+                    }
                     StatusDot(isOnline = peer?.isOnline == true)
                     Spacer(modifier = Modifier.size(16.dp))
                 },

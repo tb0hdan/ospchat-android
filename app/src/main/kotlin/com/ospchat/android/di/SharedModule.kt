@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.ospchat.android.media.AndroidAudioCallSessionFactory
+import com.ospchat.android.notifications.CallNotifier
 import com.ospchat.android.notifications.MessageNotifier
 import com.ospchat.shared.data.attachments.AndroidImageCompressor
 import com.ospchat.shared.data.attachments.AttachmentStore
@@ -11,6 +13,8 @@ import com.ospchat.shared.data.attachments.FileAttachmentStore
 import com.ospchat.shared.data.attachments.ImageCompressor
 import com.ospchat.shared.data.avatar.AvatarStore
 import com.ospchat.shared.data.avatar.FileAvatarStore
+import com.ospchat.shared.data.calls.CallDao
+import com.ospchat.shared.data.calls.CallRepository
 import com.ospchat.shared.data.discovery.DiscoveryRepository
 import com.ospchat.shared.data.discovery.NsdPeerDiscovery
 import com.ospchat.shared.data.discovery.PeerDiscoveryService
@@ -37,6 +41,7 @@ import com.ospchat.shared.domain.groups.CreateGroupUseCase
 import com.ospchat.shared.domain.groups.GroupBroadcaster
 import com.ospchat.shared.domain.groups.LeaveGroupUseCase
 import com.ospchat.shared.domain.groups.RemoveGroupMembersUseCase
+import com.ospchat.shared.media.AudioCallSessionFactory
 import com.ospchat.shared.net.client.MessageClient
 import com.ospchat.shared.net.server.MessageServer
 import com.ospchat.shared.notifications.ActiveChatTracker
@@ -48,6 +53,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
 import javax.inject.Singleton
+import com.ospchat.shared.notifications.CallNotifier as SharedCallNotifier
 import com.ospchat.shared.notifications.MessageNotifier as SharedMessageNotifier
 
 /**
@@ -317,6 +323,39 @@ object SharedModule {
         groupBroadcaster: GroupBroadcaster,
     ): LeaveGroupUseCase = LeaveGroupUseCase(groupRepository, groupDao, groupBroadcaster)
 
+    // ---- Calls ---------------------------------------------------------------
+
+    @Provides
+    @Singleton
+    fun provideAudioCallSessionFactory(
+        @ApplicationContext context: android.content.Context,
+    ): AndroidAudioCallSessionFactory = AndroidAudioCallSessionFactory(context)
+
+    @Provides
+    @Singleton
+    fun provideAudioCallSessionFactoryAsShared(impl: AndroidAudioCallSessionFactory): AudioCallSessionFactory = impl
+
+    @Provides
+    @Singleton
+    fun provideCallRepository(
+        callDao: CallDao,
+        client: MessageClient,
+        identityRepository: IdentityRepository,
+        discoveryRepository: DiscoveryRepository,
+        sessionFactory: AudioCallSessionFactory,
+        notifier: SharedCallNotifier,
+        peerDao: PeerDao,
+    ): CallRepository =
+        CallRepository(
+            dao = callDao,
+            client = client,
+            identityRepository = identityRepository,
+            discoveryRepository = discoveryRepository,
+            sessionFactory = sessionFactory,
+            notifier = notifier,
+            peerDao = peerDao,
+        )
+
     // ---- Embedded HTTP server ------------------------------------------------
 
     @Provides
@@ -333,6 +372,7 @@ object SharedModule {
         groupMessageRepository: GroupMessageRepository,
         groupRepository: GroupRepository,
         groupSyncer: GroupSyncer,
+        callRepository: CallRepository,
     ): MessageServer =
         MessageServer(
             discoveryRepository = discoveryRepository,
@@ -346,6 +386,7 @@ object SharedModule {
             groupMessageRepository = groupMessageRepository,
             groupRepository = groupRepository,
             groupSyncer = groupSyncer,
+            callRepository = callRepository,
         )
 }
 
@@ -360,4 +401,8 @@ abstract class NotifierBindings {
     @Binds
     @Singleton
     abstract fun bindMessageNotifier(impl: MessageNotifier): SharedMessageNotifier
+
+    @Binds
+    @Singleton
+    abstract fun bindCallNotifier(impl: CallNotifier): SharedCallNotifier
 }

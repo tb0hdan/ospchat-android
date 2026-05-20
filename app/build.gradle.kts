@@ -91,10 +91,19 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
+    // Extended icon set — pulls in the long-tail icons we need for the
+    // call UI (CallEnd, Mic, MicOff). Adds ~5 MB to the APK but isn't
+    // worth maintaining custom vector drawables for half a dozen icons.
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.emoji2.bundled)
     implementation(libs.androidx.emoji2.emojipicker)
     implementation(libs.coil.compose)
     implementation(libs.androidx.exifinterface)
+    // libwebrtc Android bindings via Stream's actively-maintained fork
+    // (Google abandoned the official google-webrtc Android library in 2019).
+    // Keeps the `org.webrtc.*` package namespace so the wrapping code looks
+    // identical to any other WebRTC Android integration.
+    implementation(libs.stream.webrtc.android)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.hilt.android)

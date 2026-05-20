@@ -6,6 +6,46 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Added — audio voice calls (phase 1)
+
+- One-to-one LAN voice calls between OSPChat peers. Audio only — video
+  deferred to phase 2. Tap the new phone icon in any chat's `TopAppBar`
+  to call; an in-app `IncomingCallDialog` overlay rings (system default
+  ringtone via `RingtoneManager`) on the callee side. Accept opens the
+  full-screen `CallScreen` (mute + hangup); decline POSTs hangup.
+  Outbound rings auto-time-out after 30 s. Incoming calls during another
+  active call are auto-rejected with `BUSY` (no queue).
+- New `CallForegroundService` (`foregroundServiceType="microphone"`,
+  declared in manifest with `FOREGROUND_SERVICE_MICROPHONE` perm) is
+  started by `CallServiceController` when a call enters CONNECTING and
+  stopped on hangup. Keeps the mic alive when the screen sleeps or the
+  app is backgrounded — table stakes on Android 14+.
+- `RECORD_AUDIO` runtime permission requested on first call tap via
+  `rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission())`.
+  Permission denial silently no-ops (no toast / rationale for phase 1).
+- High-importance `ospchat_calls` notification channel for incoming-call
+  heads-up display when the app isn't foreground. Tap deep-links to
+  `ospchat://call/{callId}` and routes via the existing `ProcessDeepLinks`
+  hook into the `CallScreen` composable. No CallStyle / full-screen-intent
+  for phase 1 — accept/decline lives in the in-app overlay (avoids the
+  Play Store-restricted `USE_FULL_SCREEN_INTENT` permission on Android 14+
+  and the `BroadcastReceiver` round-trip CallStyle requires).
+- Media stack: `io.getstream:stream-webrtc-android:1.3.10` — Stream's
+  actively-maintained Android fork of libwebrtc, keeps the `org.webrtc.*`
+  package namespace. `AndroidAudioCallSession` wraps `PeerConnection`;
+  `AndroidAudioCallSessionFactory` (Hilt singleton) holds the shared
+  `PeerConnectionFactory` and initializes the native lib on first use.
+  ICE servers empty — LAN-only, host candidates only, no STUN / TURN.
+- Signaling rides the existing Ktor HTTP transport via four new endpoints
+  (`/v1/call/{offer,answer,ice,hangup}`) introduced in
+  `ospchat-shared:0.2.1`; media itself is UDP via libwebrtc.
+- `material-icons-extended` added to `libs.versions.toml` for the
+  `CallEnd` / `Mic` / `MicOff` icons used by the call UI. ~5 MB APK
+  impact, not worth maintaining custom vector drawables for.
+- `mavenLocal()` added to `settings.gradle.kts` so locally-published
+  shared snapshots are visible during shared-module dev cycles. The
+  Github Packages repo still wins for released versions.
+
 ### Added — reactions on group messages
 
 - Long-press a group bubble (own or peer's) to open the emoji picker; the

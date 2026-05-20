@@ -113,6 +113,33 @@ ospchat-android/
 
 ## Current Status
 
+- 2026-05-20 — **Audio voice calls (phase 1, unreleased).** One-to-one LAN
+  voice calls between OSPChat peers, audio only. Tap the new phone icon in
+  any chat's `TopAppBar` to call; an `IncomingCallDialog` overlay (above
+  the NavHost so it survives navigation) rings via `RingtoneManager` on
+  the callee side. Accept opens a full-screen `CallScreen` (mute + hangup);
+  decline POSTs `/v1/call/hangup`. Both sides honour a 30s no-answer ring
+  timeout. Second incoming call during an active call is auto-rejected
+  with `BUSY`. New `CallForegroundService`
+  (`foregroundServiceType="microphone"`, `FOREGROUND_SERVICE_MICROPHONE`
+  perm) is started by `CallServiceController` when a call enters
+  CONNECTING and stopped on hangup — keeps the mic alive when the screen
+  sleeps. `RECORD_AUDIO` runtime perm requested on first call tap;
+  silent no-op on denial for phase 1. New high-importance
+  `ospchat_calls` channel for heads-up incoming notifications (tap
+  deep-links to `ospchat://call/{callId}`). Media stack:
+  `io.getstream:stream-webrtc-android:1.3.10` wrapped in
+  `AndroidAudioCallSession` / `AndroidAudioCallSessionFactory` (Hilt
+  singleton owning the shared `PeerConnectionFactory`). ICE servers
+  empty — LAN-only, host candidates only. Signaling over existing Ktor
+  HTTP via 4 new endpoints (`/v1/call/{offer,answer,ice,hangup}`)
+  introduced in `ospchat-shared:0.2.1`; media itself is UDP.
+  `material-icons-extended` added for `CallEnd` / `Mic` / `MicOff`.
+  `mavenLocal()` added to `settings.gradle.kts` for shared-module dev
+  cycles. Out of scope phase 1 (deferred): video, call history UI,
+  group calls, multiple concurrent calls, retry/reconnect, hold,
+  CallStyle / full-screen-intent notifications (Play Store-restricted
+  perm on API 34+ + BroadcastReceiver round-trip not worth it for v1).
 - 2026-05-16 — Initial scaffold + LAN peer discovery feature created.
 - 2026-05-16 — v0.2: REST messaging over HTTP. Each peer hosts an embedded
   Ktor server on the port it advertises via NSD; `ChatScreen` lets users

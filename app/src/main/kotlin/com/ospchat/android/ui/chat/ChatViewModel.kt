@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ospchat.android.notifications.MessageNotifier
+import com.ospchat.shared.data.calls.CallRepository
 import com.ospchat.shared.data.identity.IdentityRepository
 import com.ospchat.shared.data.messages.Message
 import com.ospchat.shared.data.messages.MessageRepository
@@ -37,6 +38,7 @@ class ChatViewModel
         private val reactionRepository: ReactionRepository,
         private val activeChatTracker: ActiveChatTracker,
         private val notifier: MessageNotifier,
+        private val callRepository: CallRepository,
     ) : ViewModel() {
         val peerUuid: String =
             checkNotNull(savedStateHandle["peerUuid"]) {
@@ -180,6 +182,25 @@ class ChatViewModel
         fun onChatHidden() {
             if (activeChatTracker.activePeerUuid == peerUuid) {
                 activeChatTracker.activePeerUuid = null
+            }
+        }
+
+        /**
+         * Place an outbound voice call to the current peer. Invokes
+         * [onStarted] with the freshly-minted callId so the caller can
+         * push the in-call screen. No-op if peer isn't loaded yet or
+         * RECORD_AUDIO has not been granted (UI must request the
+         * permission before calling).
+         */
+        fun startCall(onStarted: (String) -> Unit) {
+            val target = peer.value ?: return
+            viewModelScope.launch {
+                runCatching {
+                    val callId = callRepository.startCall(target.toPeer())
+                    onStarted(callId)
+                }.onFailure {
+                    android.util.Log.w("ChatViewModel", "startCall failed", it)
+                }
             }
         }
     }

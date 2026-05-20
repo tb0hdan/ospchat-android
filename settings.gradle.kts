@@ -15,6 +15,13 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // Local development: an unpublished `ospchat-shared` SNAPSHOT or
+        // staging version produced by `make publish-local` over in
+        // ../ospchat-shared is picked up here. Listed first so it's
+        // available for dev cycles; published releases on GitHub Packages
+        // still win because Gradle picks the highest matching version
+        // across all configured repos.
+        mavenLocal()
         google()
         mavenCentral()
         // ospchat-shared is consumed from GitHub Packages. Even public
