@@ -6,6 +6,49 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Fixed — Android → Android calls stuck at `Connecting…` (ICE CHECKING forever)
+
+- Symptom: A→A calls connected on the wire (offer/answer exchange OK,
+  call notifications fire correctly), but the callee's
+  `AndroidAudioCallSession` logged `ICE connection state: CHECKING` and
+  never reached CONNECTED. After 30 s the caller's ring timeout fired
+  `NO_ANSWER`. Reproducible 100 % between two Android handsets on the
+  same Wi-Fi. A→Desktop and Desktop→A had been fixed in
+  `ospchat-shared:0.2.2` / `0.2.4` (replay=64 + buffered ICE on accept).
+- Root cause in `ospchat-shared` `CallRepository.applyIce`: when an ICE
+  candidate arrived **before** the matching offer's POST had been
+  processed, it hit `pendingOffers[callId] == null` and was dropped
+  with `applyIce: no active session and no pending offer for callId=… —
+  dropping`. The caller starts trickling local host candidates the
+  instant `setLocalDescription` returns inside `createOffer`, which on
+  Android's fast 1-2-interface gather emits the UDP host candidate
+  before the call to `client.sendCallOffer` has even finished writing
+  the offer body to the socket. Ktor on the callee then handles the
+  three resulting requests (`/v1/call/offer`, `/v1/call/ice` ×3)
+  concurrently; `applyOffer` is the heavy handler (DB upsert + ringtone
+  + Notification.MediaSession setup, ~190 ms on the test handset) so
+  the cheap `applyIce` won the mutex first. The lone useful UDP
+  candidate was discarded, leaving only the two `tcptype=active` IPv6
+  host candidates that libwebrtc emits as port-9 placeholders — these
+  are unconnectable without a TCP-passive listener on the peer, so
+  ICE checks never paired and stayed CHECKING. A→Desktop and
+  Desktop→A win the same race because Desktop's gather emits enough
+  late UDP candidates after applyOffer lands, and Android-as-callee's
+  `applyOffer` runs fast enough that the offer usually wins; A→A
+  loses both ways.
+- Fix in shared: `CallRepository` grows a `preOfferIce` buffer that
+  stashes candidates arriving for a callId we haven't yet seen an
+  offer for. `applyOffer` drains the buffer into the freshly-created
+  `PendingOffer.pendingIce` (sender-validated), so the rest of the
+  pipeline (the existing `acceptCall` → `drain remote ICE` path) sees
+  every candidate the caller sent. Entries expire after
+  `ringTimeoutMs` (30 s) if no offer ever arrives; per-callId cap of
+  64 candidates keeps the buffer bounded under flooding. BUSY-rejected
+  offers also clear the buffer immediately so it doesn't sit until
+  TTL. Wire / OpenAPI unchanged. Will land in the next `ospchat-shared`
+  release; Android picks it up via a single version bump in
+  `gradle/libs.versions.toml`.
+
 ### Fixed — Crash on accepting an incoming call without `RECORD_AUDIO`
 
 - Symptom: app crash-looped (`AndroidRuntime FATAL EXCEPTION` repeatedly

@@ -113,6 +113,33 @@ ospchat-android/
 
 ## Current Status
 
+- 2026-05-21 — **unreleased**: fixed Android → Android calls stuck at
+  `Connecting…` (ICE never leaves CHECKING, caller hits 30 s
+  `NO_ANSWER`). Root cause in `ospchat-shared`'s
+  `CallRepository.applyIce`: when an ICE candidate POST arrived before
+  the matching offer POST was processed, it hit
+  `pendingOffers[callId] == null` and was dropped. The caller fires its
+  first local UDP host candidate the instant `setLocalDescription`
+  returns inside `createOffer` — fast enough that on the wire the
+  resulting `/v1/call/ice` POST overtakes the still-in-flight
+  `/v1/call/offer` POST, especially while `applyOffer` is busy doing
+  the DB upsert + ringtone + Notification.MediaSession setup (~190 ms
+  on the test handset). On Android↔Android both sides race the same
+  way, so the only UDP host candidate gets dropped and the remaining
+  TCP-active IPv6 host candidates libwebrtc emits at port 9 are
+  unconnectable without a TCP-passive listener — ICE pairs never
+  succeed. A→Desktop and Desktop→A had been "fixed" earlier because
+  Desktop's gather is slow enough to land late UDP candidates after
+  `applyOffer`. Fix in shared: `CallRepository` grows a `preOfferIce`
+  buffer keyed by `callId` (sender-tagged, 64-candidate cap,
+  `ringTimeoutMs` TTL). `applyIce` stashes candidates here when no
+  pending offer exists; `applyOffer` drains them into the new
+  `PendingOffer.pendingIce` (sender-validated). The rest of the
+  pipeline (existing `acceptCall` → `drain remote ICE` path)
+  unchanged. BUSY-rejected offers also clear the buffer immediately.
+  Wire / OpenAPI unchanged. Will ship in the next `ospchat-shared`
+  release; Android consumes via a single version bump in
+  `gradle/libs.versions.toml`.
 - 2026-05-21 — **unreleased**: fixed crash on accepting incoming calls
   without `RECORD_AUDIO`. The outgoing-call tap in `ChatScreen` already
   gated on the runtime perm, but `IncomingCallOverlay.onAccept` called
