@@ -46,6 +46,36 @@ semantic versioning.
   shared snapshots are visible during shared-module dev cycles. The
   Github Packages repo still wins for released versions.
 
+### Fixed — Desktop → Android calls stuck on "Connecting…"
+
+- Symptom: outbound calls from the Desktop client to Android never moved
+  past `Connecting…`; the Android logcat showed
+  `ICE connection state: CHECKING` and stayed there until the 30 s
+  ring timeout. Calls in the reverse direction (Android → Desktop)
+  worked.
+- Root cause lives in `ospchat-shared`'s `CallRepository.applyIce`:
+  the callee dropped every ICE candidate that arrived before the user
+  tapped Accept (`val active = current ?: return`, where `current` is
+  only created in `acceptCall`). The caller starts trickling host
+  candidates the moment `setLocalDescription` returns inside
+  `createOffer`, so a multi-interface JVM desktop (loopback + eth +
+  wifi + docker/vpn) emits its entire candidate set well before the
+  Android user has tapped Accept — all of them landed on Android and
+  were silently discarded. Android then had the answer SDP but zero
+  remote candidates: ICE pairs from the Desktop side checked
+  one-way, never got a STUN binding response, and stayed CHECKING.
+  The reverse direction worked in practice because Android typically
+  has only one wifi interface and Desktop's user usually accepts
+  fast enough that some candidates squeak through after `current`
+  is set.
+- Fix in `ospchat-shared:0.2.2`: `PendingOffer` grows a `pendingIce`
+  buffer; `applyIce` appends to it while ringing; `acceptCall`
+  drains it into the session right after `acceptOffer` (which sets
+  the remote description, so libwebrtc is ready to accept them).
+  Wire-compatible — no OpenAPI change. Android bumps its
+  `ospchatShared` pin in `gradle/libs.versions.toml` from `0.2.1`
+  to `0.2.2`.
+
 ### Added — reactions on group messages
 
 - Long-press a group bubble (own or peer's) to open the emoji picker; the

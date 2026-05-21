@@ -113,6 +113,28 @@ ospchat-android/
 
 ## Current Status
 
+- 2026-05-20 — **unreleased**: fixed Desktop → Android calls hanging at
+  `Connecting…`. Symptom: Android logcat showed
+  `D/JvmAudioCallSession: ICE connection state: CHECKING` and the call
+  never reached CONNECTED, eventually NO_ANSWER-ing at 30 s. The reverse
+  direction (Android → Desktop) worked. Root cause in
+  `ospchat-shared`'s `CallRepository.applyIce`: the callee dropped every
+  ICE candidate that arrived before the user tapped Accept
+  (`val active = current ?: return`; `current` only gets created in
+  `acceptCall`). A multi-interface desktop JVM (loopback + eth + wifi +
+  docker/vpn) trickles its entire host-candidate set the moment
+  `setLocalDescription` returns inside `createOffer` — well before the
+  Android user accepts — so Android ended up with the answer SDP and
+  zero remote candidates and Desktop's STUN binding requests had no
+  return path. ICE pairs stayed CHECKING one-way forever. The reverse
+  direction usually worked because Android typically has only one
+  wifi interface and Desktop's user accepts fast enough that some
+  candidates squeak through after `current` is set. Fix in shared:
+  `PendingOffer` grows a `pendingIce` buffer; `applyIce` appends to
+  it while ringing; `acceptCall` drains the buffer into the session
+  right after `acceptOffer` (which sets the remote description, so
+  libwebrtc is ready to accept them). Wire-compatible — no OpenAPI
+  change.
 - 2026-05-20 — **Audio voice calls (phase 1, unreleased).** One-to-one LAN
   voice calls between OSPChat peers, audio only. Tap the new phone icon in
   any chat's `TopAppBar` to call; an `IncomingCallDialog` overlay (above
