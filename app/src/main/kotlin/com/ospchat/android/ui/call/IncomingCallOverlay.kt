@@ -1,7 +1,10 @@
 package com.ospchat.android.ui.call
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,6 +28,11 @@ import javax.inject.Inject
  * Accept routes via [onAccept] (caller wires this to the call-screen
  * navigation) and concurrently transitions the call to `CONNECTING` via
  * the repository. Decline just POSTs hangup.
+ *
+ * Android 14+ requires `RECORD_AUDIO` for the mic FG service that
+ * `CallServiceController` starts on the CONNECTING transition; accepting
+ * without it crashes the process with SecurityException. Gate accept on
+ * the runtime permission and auto-decline on denial.
  */
 @Composable
 fun IncomingCallOverlay(
@@ -32,12 +40,34 @@ fun IncomingCallOverlay(
     viewModel: IncomingCallViewModel = hiltViewModel(),
 ) {
     val ringing by viewModel.ringing.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val recordAudioLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            val call = ringing ?: return@rememberLauncherForActivityResult
+            if (granted) {
+                viewModel.accept(call.id)
+                onAccept(call.id)
+            } else {
+                viewModel.decline(call.id)
+            }
+        }
     ringing?.let { call ->
         IncomingCallDialog(
             call = call,
             onAccept = {
-                viewModel.accept(call.id)
-                onAccept(call.id)
+                val granted =
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.RECORD_AUDIO,
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (granted) {
+                    viewModel.accept(call.id)
+                    onAccept(call.id)
+                } else {
+                    recordAudioLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                }
             },
             onDecline = { viewModel.decline(call.id) },
         )

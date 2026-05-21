@@ -113,6 +113,24 @@ ospchat-android/
 
 ## Current Status
 
+- 2026-05-21 — **unreleased**: fixed crash on accepting incoming calls
+  without `RECORD_AUDIO`. The outgoing-call tap in `ChatScreen` already
+  gated on the runtime perm, but `IncomingCallOverlay.onAccept` called
+  `callRepository.acceptCall` directly — so the CONNECTING transition
+  fired `CallServiceController` → `CallForegroundService.start` →
+  `startForeground(..., FOREGROUND_SERVICE_TYPE_MICROPHONE)` with no
+  `RECORD_AUDIO` held, which the framework rejects with
+  `SecurityException` on API 31+. Crashed the process on every accept
+  for users who hadn't granted the perm yet, and crash-looped while
+  the active call sat in CONNECTING. Two-layer fix:
+  (a) `IncomingCallOverlay` now requests `RECORD_AUDIO` on accept,
+  accepts only on grant, auto-declines on denial via the existing
+  hangup path. (b) `CallForegroundService.start` and `onStartCommand`
+  both short-circuit when the perm is missing (defensive against
+  mid-call revoke from Settings) — `start` skips
+  `startForegroundService` so the 5-second startForeground deadline
+  is never armed, `onStartCommand` `stopSelf`s if dispatched anyway.
+  Wire / OpenAPI unchanged.
 - 2026-05-21 — **unreleased**: bumped `ospchat-shared` from `0.2.2` to
   `0.2.4` in `gradle/libs.versions.toml`. Brings in the detailed ICE /
   call-signaling logging added in 0.2.3 (every offer / answer / ICE

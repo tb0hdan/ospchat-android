@@ -6,6 +6,40 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Fixed — Crash on accepting an incoming call without `RECORD_AUDIO`
+
+- Symptom: app crash-looped (`AndroidRuntime FATAL EXCEPTION` repeatedly
+  from `CallForegroundService.onStartCommand:48`) the moment the callee
+  tapped Accept on an incoming call, before any UI for the call rendered.
+  Stack:
+  `SecurityException: Starting FGS with type microphone … requires …
+  RECORD_AUDIO and the app must be in the eligible state`. Once the
+  `activeCall` was in CONNECTING and the controller kept re-firing the
+  service start, the process died again on every restart.
+- Root cause: the outgoing-call path (`ChatScreen.launchCallOrRequestPermission`)
+  already gated on `RECORD_AUDIO`, but the incoming-call accept path in
+  `IncomingCallOverlay` called `viewModel.accept(callId)` directly. On
+  API 31+ the resulting CONNECTING transition fires
+  `CallServiceController` → `CallForegroundService.start` →
+  `ServiceCompat.startForeground(..., FOREGROUND_SERVICE_TYPE_MICROPHONE)`,
+  which the framework rejects with `SecurityException` if `RECORD_AUDIO`
+  is not held — unconditional process crash.
+- Fix (two layers):
+  1. `IncomingCallOverlay` now checks `RECORD_AUDIO` on accept and, if
+     missing, launches `ActivityResultContracts.RequestPermission`. On
+     grant it accepts and routes to the call screen; on denial it
+     auto-declines the call (POSTs hangup) so the caller sees the
+     normal decline path instead of a hanging ring.
+  2. Defensive guard in `CallForegroundService`: both the static
+     `start(context)` and `onStartCommand` short-circuit when
+     `RECORD_AUDIO` is not granted — `start` skips
+     `startForegroundService` entirely (so the 5-second
+     "must call startForeground" deadline is never armed), and the
+     service `stopSelf()`s if it somehow gets dispatched without the
+     perm (revoked from Settings mid-call). Logs a warning under the
+     tag `CallForegroundService` either way.
+- No wire / OpenAPI change. No shared-library version bump needed.
+
 ### Changed — ospchat-shared bumped from 0.2.2 to 0.2.4
 
 - Picks up the detailed ICE / call-signaling logging added in 0.2.3
