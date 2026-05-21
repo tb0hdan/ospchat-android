@@ -113,6 +113,31 @@ ospchat-android/
 
 ## Current Status
 
+- 2026-05-21 — **unreleased**: bumped `ospchat-shared` from `0.2.2` to
+  `0.2.4` in `gradle/libs.versions.toml`. Brings in the detailed ICE /
+  call-signaling logging added in 0.2.3 (every offer / answer / ICE
+  candidate plus call state transitions logged with the `callId` for
+  cross-side correlation) and the 0.2.4 release on top. Wire / OpenAPI
+  unchanged.
+- 2026-05-21 — **unreleased**: fixed Android → Desktop calls hanging at
+  `Connecting…` (the reverse direction of the 2026-05-20 fix below).
+  Symptom from Desktop's log: `bufferedIce=0` on accept, no `applyIce ←`
+  arrived from Android, the session sat in `NEGOTIATING` until Android
+  hung up. Root cause in `media/AndroidAudioCallSession.kt` (and the
+  mirror `JvmAudioCallSession.kt` in the desktop project): the local-ICE
+  `MutableSharedFlow` was built with `replay = 0` and
+  `extraBufferCapacity = 64`. With `replay = 0`, a `tryEmit` against a
+  flow with zero subscribers is silently discarded —
+  `extraBufferCapacity` only buffers for *existing slow subscribers*.
+  libwebrtc fires `onIceCandidate` the moment `setLocalDescription`
+  returns inside `createOffer` / `acceptOffer`, before
+  `CallRepository.bindSession`'s `scope.launch { collect { … } }`
+  schedules its collector. Android's 1-2-interface fast gather loses
+  every candidate; Desktop's many-interface slow gather loses early
+  ones but a few late candidates survive — hence the prior
+  Desktop → Android-works-but-Android → Desktop-fails asymmetry. Fix:
+  switch to `replay = 64` so emissions are preserved for any future
+  subscriber. No wire / OpenAPI change.
 - 2026-05-20 — **unreleased**: fixed Desktop → Android calls hanging at
   `Connecting…`. Symptom: Android logcat showed
   `D/JvmAudioCallSession: ICE connection state: CHECKING` and the call

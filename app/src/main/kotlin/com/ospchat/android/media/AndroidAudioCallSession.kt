@@ -45,9 +45,23 @@ class AndroidAudioCallSession(
     private val _state = MutableStateFlow(AudioCallSession.State.NEW)
     override val state: StateFlow<AudioCallSession.State> = _state.asStateFlow()
 
+    // `replay = 64` (not `extraBufferCapacity`) because libwebrtc's
+    // signaling thread starts firing `onIceCandidate` the moment
+    // `setLocalDescription` returns — which is *inside* `createOffer` /
+    // `acceptOffer`, well before `CallRepository.bindSession` has scheduled
+    // its `scope.launch { collect { … } }`. With `replay = 0`, a
+    // `tryEmit` against a flow with zero subscribers is silently
+    // discarded (the `extraBufferCapacity` buffer only kicks in for
+    // existing slow subscribers); on Android with its fast 1-2-interface
+    // gathering, *every* host candidate gets dropped on the floor and
+    // the remote side ends up with the answer SDP but no remote ICE,
+    // leaving ICE stuck in CHECKING. `replay = 64` preserves emissions
+    // for any future subscriber and is far more than typical LAN ICE
+    // produces. `DROP_OLDEST` keeps tryEmit non-suspending on libwebrtc's
+    // signaling thread.
     private val iceFlow =
         MutableSharedFlow<AudioCallSession.IceCandidate>(
-            extraBufferCapacity = 64,
+            replay = 64,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
     override val localIceCandidates: Flow<AudioCallSession.IceCandidate> = iceFlow.asSharedFlow()

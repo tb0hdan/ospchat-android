@@ -6,6 +6,41 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Changed — ospchat-shared bumped from 0.2.2 to 0.2.4
+
+- Picks up the detailed ICE / call-signaling logging added in 0.2.3
+  (every offer / answer / ICE candidate, local + remote, and every call
+  state transition is now logged with the `callId` for cross-side
+  correlation, plus the candidate string itself so CHECKING-forever cases
+  are diagnosable from logs alone) and the 0.2.4 release on top. Android's
+  `gradle/libs.versions.toml` pin moves from `0.2.2` to `0.2.4`. Wire /
+  OpenAPI unchanged.
+
+### Fixed — Android → Desktop calls stuck on "Connecting…"
+
+- Reverse-direction sibling to the Desktop → Android fix below. Symptom:
+  Android-initiated calls to Desktop never moved past `Connecting…` (Desktop
+  log showed `bufferedIce=0` on accept, no `applyIce ←` lines ever arrived,
+  Desktop emitted only a single TCP-passive host candidate, session stayed
+  in `NEGOTIATING` until hangup). Root cause in
+  `media/AndroidAudioCallSession.kt` (and mirrored in the desktop project's
+  `JvmAudioCallSession.kt`): the local-ICE `MutableSharedFlow` was built
+  with `replay = 0` and `extraBufferCapacity = 64`. The original comment
+  claimed this buffered 64 candidates; it does not — with `replay = 0`,
+  `tryEmit` against a flow with zero subscribers is silently discarded
+  (`extraBufferCapacity` only kicks in for *existing slow subscribers*).
+  libwebrtc's signaling thread starts firing `onIceCandidate` the instant
+  `setLocalDescription` returns inside `createOffer` / `acceptOffer` —
+  which happens **before** `CallRepository.bindSession`'s
+  `scope.launch { collect { … } }` has scheduled its collector. Asymmetry:
+  Desktop has many interfaces (loopback + eth + wifi + docker/vpn) and
+  gathers slowly enough that some late candidates survived past
+  subscription; Android with its 1-2 interfaces gathered fast enough
+  that *every* host candidate was lost. Fix: use `replay = 64` instead
+  of `extraBufferCapacity = 64`; the most-recent 64 emissions are
+  preserved and replayed to the first subscriber when `bindSession`
+  attaches. No wire / OpenAPI change.
+
 ### Added — audio voice calls (phase 1)
 
 - One-to-one LAN voice calls between OSPChat peers. Audio only — video
