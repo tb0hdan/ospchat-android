@@ -9,7 +9,9 @@ import com.ospchat.android.notifications.CallNotifier
 import com.ospchat.android.notifications.MessageNotifier
 import com.ospchat.shared.data.attachments.AndroidImageCompressor
 import com.ospchat.shared.data.attachments.AttachmentStore
+import com.ospchat.shared.data.attachments.BitmapFactoryImageBounds
 import com.ospchat.shared.data.attachments.FileAttachmentStore
+import com.ospchat.shared.data.attachments.ImageBounds
 import com.ospchat.shared.data.attachments.ImageCompressor
 import com.ospchat.shared.data.avatar.AvatarStore
 import com.ospchat.shared.data.avatar.FileAvatarStore
@@ -98,6 +100,10 @@ object SharedModule {
     @Singleton
     fun provideImageCompressor(): ImageCompressor = AndroidImageCompressor()
 
+    @Provides
+    @Singleton
+    fun provideImageBounds(): ImageBounds = BitmapFactoryImageBounds()
+
     // ---- Discovery -----------------------------------------------------------
 
     @Provides
@@ -156,7 +162,14 @@ object SharedModule {
         client: MessageClient,
         peerDao: PeerDao,
         avatarStore: AvatarStore,
-    ): PeerAvatarSync = PeerAvatarSync(client = client, peerDao = peerDao, avatarStore = avatarStore)
+        avatarBounds: ImageBounds,
+    ): PeerAvatarSync =
+        PeerAvatarSync(
+            client = client,
+            peerDao = peerDao,
+            avatarStore = avatarStore,
+            avatarBounds = avatarBounds,
+        )
 
     @Provides
     @Singleton
@@ -196,6 +209,7 @@ object SharedModule {
         notifier: SharedMessageNotifier,
         attachmentStore: AttachmentStore,
         attachmentCompressor: ImageCompressor,
+        attachmentBounds: ImageBounds,
     ): MessageRepository =
         MessageRepository(
             messageDao = messageDao,
@@ -205,6 +219,7 @@ object SharedModule {
             notifier = notifier,
             attachmentStore = attachmentStore,
             attachmentCompressor = attachmentCompressor,
+            attachmentBounds = attachmentBounds,
         )
 
     // ---- Group repositories -------------------------------------------------
