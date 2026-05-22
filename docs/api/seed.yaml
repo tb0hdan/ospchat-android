@@ -1,0 +1,160 @@
+openapi: "3.0.3"
+info:
+  title: OSPChat Seed Server
+  description: |
+    HTTP API exposed by OSPChat Android Seed Mode on port 8080 of the device's
+    Wi-Fi hotspot interface. This is **not** the peer-to-peer protocol — those
+    endpoints live in `ospchat-shared/docs/openapi.yaml` and are designed
+    for OSPChat clients only. The Seed Mode API is intentionally browser-
+    friendly and unauthenticated, so users without OSPChat installed can
+    download the right installer on first contact.
+
+    Trust boundary: the Wi-Fi hotspot is the trust boundary. Anyone with the
+    hotspot password can download the served files. No auth is performed.
+  version: "1.0.0"
+
+servers:
+  - url: "http://{hotspotIp}:8080"
+    description: Seed server on a phone's Wi-Fi hotspot.
+    variables:
+      hotspotIp:
+        default: "192.168.43.1"
+        description: >
+          The site-local IPv4 address of the phone's hotspot interface.
+          Typical Android default is `192.168.43.1`; OEMs may use `192.168.49.1`
+          or similar. The actual URL is rendered into a QR code on the seed
+          phone's Seed Mode screen.
+
+paths:
+  /:
+    get:
+      summary: Installer landing page
+      description: |
+        Self-contained HTML page listing every catalog entry. Includes a
+        small inline `<script>` that performs User-Agent sniffing to
+        highlight the recommended download for the visitor's device.
+        Uncached desktop binaries render as grey text rather than a link.
+        No external resources are referenced — the page works inside
+        captive-portal browsers.
+      responses:
+        "200":
+          description: HTML landing page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /health:
+    get:
+      summary: Health check
+      description: Confirms the seed server is bound and routing requests.
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /download/{id}:
+    get:
+      summary: Download a catalog package
+      description: |
+        Streams the bytes for the package whose `id` matches a catalog
+        entry. The `android` id is special: it serves the phone's own
+        installed APK directly from `Context.applicationInfo.sourceDir`
+        and is **always** available without a prior download step. All
+        other ids serve a file previously fetched from GitHub Releases
+        and cached at `filesDir/seed/<id>/<asset-name>`.
+
+        Range requests (`Range: bytes=...`) are honoured via Ktor's
+        `PartialContent` plugin so a browser or download manager can
+        resume an interrupted pull.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - android
+              - windows
+              - macos-arm64
+              - macos-x86_64
+              - linux-deb
+      responses:
+        "200":
+          description: Installer binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="ospchat-android-0.2.4.apk"'
+            Content-Length:
+              schema:
+                type: integer
+                format: int64
+            Accept-Ranges:
+              schema:
+                type: string
+                example: bytes
+          content:
+            application/vnd.android.package-archive:
+              schema:
+                type: string
+                format: binary
+            application/x-msi:
+              schema:
+                type: string
+                format: binary
+            application/x-apple-diskimage:
+              schema:
+                type: string
+                format: binary
+            application/vnd.debian.binary-package:
+              schema:
+                type: string
+                format: binary
+        "206":
+          description: Partial content for a Range request
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Unknown package id (not in the catalog)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Package is in the catalog but not cached on this seed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Machine-readable slug.
+          enum:
+            - not_cached
+            - unknown_package
+        id:
+          type: string
+          description: Echo of the requested package id (when applicable).

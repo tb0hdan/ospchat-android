@@ -6,6 +6,212 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Added — Seed Mode (offline bootstrap)
+
+- A phone running OSPChat can now act as an installer distribution point over
+  its Wi-Fi hotspot, so a single device can kickstart an entire offline mesh
+  from a single newcomer joining the hotspot. About → **Seed Mode** opens a
+  new screen with a hotspot indicator, a package checklist (5 installers:
+  Android APK, Windows `.msi`, macOS `.dmg` for Apple Silicon and Intel, and
+  Linux `.deb`), a manual GitHub refresh button, and Start/Stop controls
+  for the embedded HTTP server.
+- The Android binary served by the seed is the phone's own installed APK
+  (`Context.applicationInfo.sourceDir`) — always available, no download
+  required, marked "Built-in" in the checklist. Every phone with OSPChat
+  installed is therefore one tap away from re-seeding the Android binary,
+  even on first launch without internet. Desktop binaries are pulled from
+  the `tb0hdan/ospchat-desktop` GitHub latest release on demand (manual
+  Refresh + per-package Download Selected) and cached under
+  `filesDir/seed/<id>/`.
+- New `SeedForegroundService` (foregroundServiceType `dataSync`, paired
+  with `FOREGROUND_SERVICE_DATA_SYNC` permission). Embedded Ktor CIO
+  server binds to `0.0.0.0:8080`; routes are generated from a single
+  catalog list in `seed/catalog/SeedCatalog.kt`. The notification carries
+  a "Stop" action that routes through `MainActivity.ACTION_STOP_SEED`.
+  Runs independently of `DiscoveryForegroundService` — peer messaging and
+  seed serving can be active simultaneously.
+- Hotspot interface auto-detected by enumerating
+  `NetworkInterface.getNetworkInterfaces()` and picking the first up,
+  non-loopback, IPv4, site-local address (covers `192.168.x.x` and
+  `10.x.x.x` regardless of OEM-specific interface names like `ap0`,
+  `wlan1`, `softap0`). The user enables the hotspot manually in system
+  settings; the Seed Mode screen surfaces an "Open Wi-Fi settings"
+  button and a 2-second polling loop that picks up the IP as soon as
+  the hotspot comes up.
+- QR generation via `com.google.zxing:core:3.5.3`. Renders the URL
+  `http://<hotspot-ip>:8080/` into a `Bitmap` displayed in the screen.
+- `ktor-server-partial-content` and `ktor-server-auto-head-response`
+  added so browsers can resume an interrupted large-file pull via HTTP
+  Range requests. Files stream via `respondFile` (no slurp into RAM —
+  the existing `MessageServer`'s `respondBytes` pattern would OOM on a
+  140 MB DMG).
+- Dedicated `@SeedHttpClient`-qualified `HttpClient` for GitHub fetches
+  and large-file downloads (no `requestTimeoutMillis`, 30 s socket
+  timeout, follows redirects). The default messaging `HttpClient`'s 5 s
+  request timeout is fatal for asset downloads — they share Ktor's
+  `HttpTimeout` plugin but need very different settings.
+- New `docs/api/seed.yaml` documents the public HTTP API. The peer
+  protocol's `openapi.yaml` is unchanged.
+
+### Changed — Folded "Serving at" into the Wi-Fi hotspot line
+
+- Removed the separate `Serving at <url>` monospace label that
+  appeared above the QR slot whenever the seed server was running.
+  The Wi-Fi hotspot line now does double duty: when the server is
+  stopped, it shows `Wi-Fi hotspot: 192.168.x.x`; once the server
+  is started, the substitution flips to the full URL
+  (`Wi-Fi hotspot: http://192.168.x.x:8080`), and reverts to the
+  bare IP on stop. One less line in the card, no separate label to
+  reflow around. Removed the now-unused
+  `seed_mode_server_running` string and the
+  `FontFamily.Monospace` / `FontWeight.SemiBold` imports.
+
+### Fixed — Seed Mode QR slot off-center in the placeholder state
+
+- Symptom: when no server was running, the "Start server to get
+  QR" placeholder appeared left-aligned in the hotspot card, but
+  the rendered QR (server running) sat centered. The two states
+  did not occupy the same screen position.
+- Cause: `QrSlot` was a single 240×240 `Box` with the white
+  background, positioned via `Modifier.align(Alignment.CenterHorizontally)`
+  passed in from the caller's `ColumnScope`. The `Modifier.align`
+  is a layout-time positioning hint, and in this column with
+  default `Alignment.Start` it didn't reliably horizontally center
+  the small placeholder, while the QR image fills the inner box
+  via `Modifier.fillMaxSize()` so it always *looked* centered.
+- Fix: `QrSlot` now wraps the 240×240 white box in an outer
+  `Box(fillMaxWidth, contentAlignment = Alignment.Center)`. Both
+  states (placeholder text and rendered QR) live inside the same
+  inner box, which is always centered in the card regardless of
+  which child is drawn. Caller drops the per-call `align` modifier.
+
+### Changed — Wi-Fi hotspot status collapsed to a single line
+
+- The hotspot card's two-line "Wi-Fi hotspot" header + "Hotspot
+  detected at <ip>" body is now a single `titleSmall` line:
+  `Wi-Fi hotspot: 192.168.x.x` (active) or `Wi-Fi hotspot: not
+  detected` (inactive, with the existing "Open Wi-Fi settings"
+  button still below). Saves vertical space above the QR slot.
+- String changes: `seed_mode_hotspot_header` removed;
+  `seed_mode_hotspot_active` reworded to "Wi-Fi hotspot: %1$s";
+  `seed_mode_hotspot_inactive` reworded to "Wi-Fi hotspot: not
+  detected".
+
+### Fixed — Android APK served by Seed Mode was named "base.apk"
+
+- Symptom: scanning the Seed Mode QR from a peer and tapping the
+  Android row downloaded an installer with the generic filename
+  `base.apk`, matching the on-disk path Android uses for installed
+  APKs (`/data/app/.../base.apk`). Confusing for the receiver and
+  collides if multiple seed downloads land in the same Downloads
+  folder.
+- Root cause in `SeedServer`'s `/download/{id}` route and the
+  landing-page row renderer: both used `file.name` for the
+  `Content-Disposition` filename and the meta label. For the
+  `SelfApk` package the resolved `File` was
+  `Context.applicationInfo.sourceDir`, whose `name` is always
+  `base.apk` on Android. The repository's manifest correctly
+  carried the friendlier `ospchat-android.apk` (now versioned)
+  but the server was bypassing the manifest and reading directly
+  off the `File`.
+- Fix: `SeedRepository.servedFileFor` now returns a `ServedFile`
+  pair (`File` + `downloadName`) instead of a raw `File`. SelfApk
+  composes `ospchat-android-<version>.apk` (version pulled from
+  `R.string.app_version_name`, which is already populated from the
+  `VERSION` file in `app/build.gradle.kts`); `GitHubRelease`
+  preserves the original asset name. `SeedServer` uses
+  `served.downloadName` for both the `Content-Disposition` header
+  and the landing-page row label. `SeedRepository.resolveDescriptor`
+  for SelfApk also surfaces the same versioned name in the manifest
+  so the Seed Mode checklist UI shows it consistently.
+- `docs/api/seed.yaml`: `Content-Disposition` example updated.
+
+### Fixed — Seed Mode download progress bar showed a disconnected dot at the end
+
+- Symptom: while a Seed Mode installer was downloading, the row's
+  `LinearProgressIndicator` rendered the in-progress portion of the
+  bar plus a small disconnected circle pinned to the far-right end
+  of the track. The dot only joined the bar once the download
+  completed and the bar hit 100%.
+- Root cause: Material 3's `LinearProgressIndicator` defaults to
+  drawing a "stop indicator" — a filled circle at the trailing end
+  of the track per the M3 spec — whenever `progress < 1f`. Not a
+  bug, just an opinionated default that read as visual noise here.
+- Fix: pass `drawStopIndicator = {}` (no-op lambda) to the
+  `LinearProgressIndicator` in `PackageRow`. The bar now grows
+  cleanly from 0% to 100% with no trailing dot.
+
+### Changed — QR slot folded into the hotspot card
+
+- The QR / serving-URL card no longer appears separately under the
+  Start/Stop server button. Instead, the existing hotspot status
+  card (Wi-Fi hotspot header + detected IP) now hosts a fixed-size
+  QR slot at the bottom. Stable layout: the slot keeps its
+  `QR_DISPLAY_SIZE` (240 dp) footprint whether the server is
+  running or not, so nothing reflows on Start/Stop.
+- States:
+  - Server stopped → white QR-sized box with the placeholder text
+    "Start server to get QR".
+  - Server starting (URL known, bitmap not rendered yet) → centered
+    `CircularProgressIndicator` in the same slot (the QR render
+    loop is fast but not instantaneous).
+  - Server running → the actual QR plus the "Serving at <url>" line
+    in monospace right above the slot.
+- Removed the now-redundant `ServerInfoCard` composable. Stop now
+  just stops; the slot in the hotspot card flips back to the
+  placeholder via the existing
+  `SeedModeViewModel.observeServerState` path that nulls
+  `qrBitmap` when `serverUrl` becomes null. New string
+  `seed_mode_qr_placeholder`.
+
+### Added — Seed Mode "Clear cache" button
+
+- New "Clear cache" outlined button (error-tone) directly under
+  "Download Selected" on the Seed Mode screen. Tap opens a Material 3
+  `AlertDialog` confirming the destructive action; confirm deletes
+  every cached desktop installer (and any leftover `.part` scratch
+  files) under `filesDir/seed/<id>/`, then refreshes the manifest so
+  every row flips back to "Not downloaded" immediately. The bundled
+  Android APK is not in this tree (`Context.applicationInfo.sourceDir`),
+  so the built-in Android row is unaffected.
+- Plumbing: new `SeedCache.clearAll()` wipes the tree but keeps the
+  per-descriptor directories (they're re-created on demand by
+  `packageDir`). New `SeedRepository.clearCache()` runs the wipe on
+  `Dispatchers.IO`. New `SeedModeViewModel.clearCache()` calls the
+  repository, then `refreshManifest()` to pick up the new state.
+- Button is disabled while a batch download is running, while the
+  seed server is running (so an in-flight peer GET can't race a
+  wipe), and when nothing non-builtin is cached. No wire / OpenAPI
+  change.
+
+### Fixed — Seed Mode row status stuck at "Not downloaded" after a successful download
+
+- Symptom: in Seed Mode, ticking multiple installers and tapping
+  "Download Selected" downloaded every artifact correctly, but each
+  per-row status label reverted to "Not downloaded" the instant the
+  individual download finished — the label only flipped to "Cached"
+  after the *entire batch* completed. Confusing for users staring at
+  a row that just hit 100%.
+- Root cause in `SeedModeViewModel.downloadSelected`: per-item the
+  loop calls `downloadProgress.remove(id)` after `downloadPackage`
+  returns and then moves on. The status label is derived from
+  `SeedPackageRow.isCached`, which is populated from `latestManifest`
+  — but `latestManifest` is only re-fetched inside the `finally`
+  block once *all* items in the batch are done. So between
+  "this item finished" and "the whole batch finished" the row's
+  `isCached` was still `false`, and removing the in-flight progress
+  entry made the UI fall back to the "Not downloaded" branch of
+  `packageStatusLabel`.
+- Fix: split the per-item path into success/failure handling. On
+  success call a new `markCached(id)` helper that flips `isCached`
+  to `true` on the matching entry in *both* `latestManifest` (so
+  later iterations in the same batch see the updated state) and the
+  visible `Ready.packages` row (so the label re-renders immediately),
+  and clears `downloadProgress` for that row in the same state copy.
+  The end-of-batch `refreshManifest()` call is preserved — it now
+  just confirms what the optimistic update already showed and picks
+  up any GitHub-side metadata changes.
+
 ### Fixed — Android → Android calls stuck at `Connecting…` (ICE CHECKING forever)
 
 - Symptom: A→A calls connected on the wire (offer/answer exchange OK,

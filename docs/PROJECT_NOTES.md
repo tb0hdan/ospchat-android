@@ -113,6 +113,113 @@ ospchat-android/
 
 ## Current Status
 
+- 2026-05-22 — **unreleased**: Seed Mode "Serving at" line folded
+  into the Wi-Fi hotspot status. The separate monospace
+  `Serving at <url>` label above the QR is gone; the hotspot line
+  now shows `Wi-Fi hotspot: 192.168.x.x` when the server is
+  stopped and flips to `Wi-Fi hotspot: http://192.168.x.x:8080`
+  when running, then back. Implementation just picks
+  `serverUrl ?: hotspotIp` as the substitution for the existing
+  `seed_mode_hotspot_active` format string. Removed the unused
+  `seed_mode_server_running` string and Monospace/SemiBold
+  imports.
+- 2026-05-22 — **unreleased**: Seed Mode QR slot centered in both
+  states. The 240×240 white-bg box is now wrapped in an outer
+  `Box(fillMaxWidth, contentAlignment = Alignment.Center)`, so the
+  placeholder text and the rendered QR occupy the exact same
+  screen position. Previous version used a per-call
+  `Modifier.align(Alignment.CenterHorizontally)` that read as
+  centered for the image (it filled the inner box) but
+  inconsistently positioned for the small placeholder text.
+- 2026-05-22 — **unreleased**: Wi-Fi hotspot status in the Seed
+  Mode hotspot card collapsed from two lines (header + body) to a
+  single `titleSmall` line: `Wi-Fi hotspot: 192.168.x.x` when
+  detected, `Wi-Fi hotspot: not detected` otherwise. The "Open
+  Wi-Fi settings" button below the inactive line is unchanged.
+  Removed `seed_mode_hotspot_header`; reworded
+  `seed_mode_hotspot_active` / `seed_mode_hotspot_inactive`.
+- 2026-05-22 — **unreleased**: Seed Mode Android download filename
+  fix. The server used to advertise `base.apk` in
+  `Content-Disposition` because for the `SelfApk` package the
+  resolved `File` was `Context.applicationInfo.sourceDir`, which on
+  Android is `/data/app/.../base.apk`. `SeedRepository.servedFileFor`
+  now returns a `ServedFile` pair (file + download name); the
+  SelfApk branch composes `ospchat-android-<version>.apk` from
+  `R.string.app_version_name`. `SeedServer` uses the paired
+  `downloadName` for both `Content-Disposition` and the landing-page
+  meta label. Manifest's `SeedPackageInfo.fileName` for SelfApk now
+  carries the same versioned name so the Seed Mode checklist UI
+  matches. `docs/api/seed.yaml` example updated.
+- 2026-05-22 — **unreleased**: Seed Mode download progress bar
+  no longer renders a disconnected dot at the trailing end while a
+  download is in progress. Material 3's `LinearProgressIndicator`
+  defaults to drawing a "stop indicator" (a filled circle at the
+  end of the track per spec) whenever `progress < 1f`. Suppressed
+  in `PackageRow` by passing `drawStopIndicator = {}`.
+- 2026-05-22 — **unreleased**: Seed Mode QR slot folded into the
+  hotspot card. The separate QR/serving-URL card under Start/Stop is
+  gone; the existing Wi-Fi-hotspot card now hosts a fixed-size
+  (`QR_DISPLAY_SIZE = 240 dp`) QR slot at the bottom. Stopped →
+  placeholder text "Start server to get QR" on a white background.
+  URL-known-but-bitmap-not-yet → centered `CircularProgressIndicator`
+  in the slot. Running → actual QR + "Serving at <url>" line above
+  the slot. Slot keeps its footprint across states so nothing
+  reflows on Start/Stop. New string `seed_mode_qr_placeholder`;
+  `ServerInfoCard` removed.
+- 2026-05-22 — **unreleased**: Seed Mode "Clear cache" button. New
+  error-tone outlined button under "Download Selected" on the Seed
+  Mode screen wipes every cached desktop installer under
+  `filesDir/seed/<id>/` after a confirmation dialog; the built-in
+  Android APK (served from `Context.applicationInfo.sourceDir`) is
+  untouched. Plumbed as `SeedCache.clearAll()` →
+  `SeedRepository.clearCache()` (IO dispatcher) →
+  `SeedModeViewModel.clearCache()` (then `refreshManifest` so every
+  row flips back to "Not downloaded"). Button is disabled while a
+  batch download is running, while the seed server is running (so an
+  in-flight peer GET can't race a wipe), and when nothing
+  non-builtin is cached.
+- 2026-05-22 — **unreleased**: Seed Mode row status fix. Per-row
+  status in the Seed Mode checklist used to revert from
+  `Downloading N%` to `Not downloaded` the moment an individual
+  download finished, only flipping to `Cached` after the whole
+  batch completed. `SeedModeViewModel.downloadSelected` was
+  removing the progress entry after each successful
+  `downloadPackage`, but `latestManifest` (the source of
+  `SeedPackageRow.isCached`) was only refreshed in the `finally`
+  block. Fix: new `markCached(id)` helper updates both
+  `latestManifest` and the visible state row's `isCached` /
+  `downloadProgress` atomically on success, so the label flips to
+  `Cached` the instant each artifact finishes. End-of-batch
+  `refreshManifest()` retained as a confirmation pass.
+- 2026-05-22 — **unreleased**: Seed Mode. A phone running OSPChat can act
+  as a bootstrap node for a completely offline mesh. About → Seed Mode
+  opens a new full-screen route that detects the Wi-Fi hotspot
+  interface (user enables it manually via system settings; the screen
+  surfaces an "Open Wi-Fi settings" shortcut and polls
+  `NetworkInterface.getNetworkInterfaces()` every 2 s for the first
+  up, non-loopback, site-local IPv4 address), lets the user
+  selectively download desktop installers from the
+  `tb0hdan/ospchat-desktop` GitHub latest release into
+  `filesDir/seed/<id>/`, and starts an embedded Ktor CIO server on
+  `0.0.0.0:8080` bound to the hotspot interface. The Android APK
+  served by the seed is the phone's own installed binary
+  (`Context.applicationInfo.sourceDir`) — always available, no
+  download required. Routes are generated from a single catalog list
+  in `seed/catalog/SeedCatalog.kt`: `GET /` (HTML landing page with
+  User-Agent sniffing), `GET /health`, and one
+  `GET /download/{id}` per descriptor. `respondFile` + the new
+  `PartialContent` + `AutoHeadResponse` plugins give browsers Range-
+  request resume. QR rendering via `com.google.zxing:core:3.5.3`.
+  New `SeedForegroundService` (type `dataSync`, paired
+  `FOREGROUND_SERVICE_DATA_SYNC` permission) keeps the server alive
+  when the screen sleeps. Runs independently of
+  `DiscoveryForegroundService`; both can be active at the same time.
+  A `SeedServerState` `@Singleton` shared between the service and the
+  view model lets the screen render the correct Start/Stop state and
+  QR when the user navigates back into Seed Mode while the server is
+  already running. Wire protocol unchanged; the public-facing HTTP
+  endpoints are documented in `docs/api/seed.yaml`, distinct from
+  the peer-protocol `openapi.yaml`.
 - 2026-05-21 — **unreleased**: fixed Android → Android calls stuck at
   `Connecting…` (ICE never leaves CHECKING, caller hits 30 s
   `NO_ANSWER`). Root cause in `ospchat-shared`'s

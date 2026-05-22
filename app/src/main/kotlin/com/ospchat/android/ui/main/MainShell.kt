@@ -35,6 +35,7 @@ import com.ospchat.shared.data.peers.PeerRecord
 fun MainShell(
     onPeerClick: (PeerRecord) -> Unit,
     onGroupClick: (GroupRecord) -> Unit,
+    onSeedModeClick: () -> Unit,
 ) {
     var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
 
@@ -64,7 +65,7 @@ fun MainShell(
             when (MainTab.entries[selectedIndex]) {
                 MainTab.Contacts -> PeersScreen(onPeerClick = onPeerClick)
                 MainTab.Groups -> GroupsScreen(onGroupClick = onGroupClick)
-                MainTab.About -> AboutScreen()
+                MainTab.About -> AboutScreen(onSeedModeClick = onSeedModeClick)
             }
         }
     }

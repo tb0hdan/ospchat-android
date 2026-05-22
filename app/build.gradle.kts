@@ -119,10 +119,16 @@ dependencies {
     implementation(libs.ktor.server.cio)
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.server.status.pages)
+    // Range-request streaming for Seed Mode large-file downloads — browsers
+    // and download managers can resume an interrupted APK / DMG pull.
+    implementation(libs.ktor.server.partial.content)
+    implementation(libs.ktor.server.auto.head.response)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)
+
+    implementation(libs.zxing.core)
 
     runtimeOnly(libs.slf4j.nop)
 }

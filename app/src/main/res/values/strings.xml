@@ -87,6 +87,7 @@
     <string name="about_exit_cancel">Cancel</string>
     <string name="about_exit_confirm_title">Exit OSPChat?</string>
     <string name="about_exit_confirm_message">Discovery and messaging will stop, and OSPChat will be removed from your recent apps. Other peers will no longer see you on the network until you re-open the app.</string>
+    <string name="about_seed_mode">Seed Mode</string>
 
     <string name="notification_channel_discovery">Peer discovery</string>
     <string name="notification_title">OSPChat</string>
@@ -95,4 +96,38 @@
 
     <string name="notification_channel_messages">Messages</string>
     <string name="notification_channel_messages_desc">New chat messages from peers on your network.</string>
+
+    <string name="seed_mode_title">Seed Mode</string>
+    <string name="seed_mode_blurb">Share OSPChat with new devices over your Wi-Fi hotspot. Newcomers join the hotspot, scan the QR, and download the right installer — no internet required.</string>
+    <string name="seed_mode_hotspot_active">Wi-Fi hotspot: %1$s</string>
+    <string name="seed_mode_hotspot_inactive">Wi-Fi hotspot: not detected</string>
+    <string name="seed_mode_open_settings">Open Wi-Fi settings</string>
+    <string name="seed_mode_packages_header">Packages</string>
+    <string name="seed_mode_download_selected">Download selected</string>
+    <string name="seed_mode_refresh">Refresh from GitHub</string>
+    <string name="seed_mode_clear_cache">Clear cache</string>
+    <string name="seed_mode_clear_cache_confirm_title">Clear cached installers?</string>
+    <string name="seed_mode_clear_cache_confirm_message">Removes every desktop installer previously downloaded by Seed Mode. The bundled Android APK is unaffected. Cleared installers will need to be re-downloaded over the internet.</string>
+    <string name="seed_mode_clear_cache_confirm_button">Clear</string>
+    <string name="seed_mode_clear_cache_cancel">Cancel</string>
+    <string name="seed_mode_start_server">Start seed server</string>
+    <string name="seed_mode_stop_server">Stop seed server</string>
+    <string name="seed_mode_qr_content_description">QR code for the seed server URL</string>
+    <string name="seed_mode_qr_placeholder">Start server to get QR</string>
+    <string name="seed_mode_cached">Cached</string>
+    <string name="seed_mode_builtin">Built-in</string>
+    <string name="seed_mode_not_downloaded">Not downloaded</string>
+    <string name="seed_mode_downloading">Downloading… %1$d%%</string>
+    <string name="seed_mode_size">%1$s MB</string>
+    <string name="seed_mode_status_separator">%1$s · %2$s</string>
+    <string name="seed_mode_error_no_hotspot">No hotspot interface found. Enable the Wi-Fi hotspot first.</string>
+    <string name="seed_mode_error_port_in_use">Port 8080 is already in use. Stop the other app and try again.</string>
+    <string name="seed_mode_error_fetch_failed">Could not fetch release info from GitHub.</string>
+    <string name="seed_mode_error_download_failed">Download failed: %1$s</string>
+    <string name="seed_mode_release_label">Latest release: %1$s</string>
+
+    <string name="notification_channel_seed">Seed Mode</string>
+    <string name="notification_seed_title">OSPChat Seed Mode</string>
+    <string name="notification_seed_text">Serving installers at %1$s</string>
+    <string name="notification_seed_action_stop">Stop</string>
 </resources>

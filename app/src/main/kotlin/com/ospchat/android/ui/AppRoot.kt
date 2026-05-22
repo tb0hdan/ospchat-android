@@ -29,6 +29,7 @@ import com.ospchat.android.ui.chat.ChatScreen
 import com.ospchat.android.ui.groupchat.GroupChatScreen
 import com.ospchat.android.ui.main.MainShell
 import com.ospchat.android.ui.nickname.NicknameScreen
+import com.ospchat.android.ui.seed.SeedModeScreen
 
 @Composable
 fun AppRoot(viewModel: AppViewModel = hiltViewModel()) {
@@ -52,7 +53,11 @@ private fun MainNav() {
                 MainShell(
                     onPeerClick = { peer -> navController.navigate(Routes.chat(peer.uuid)) },
                     onGroupClick = { group -> navController.navigate(Routes.group(group.id)) },
+                    onSeedModeClick = { navController.navigate(Routes.SEED_MODE) },
                 )
+            }
+            composable(Routes.SEED_MODE) {
+                SeedModeScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = Routes.CHAT_PATTERN,
@@ -116,6 +121,7 @@ private fun LoadingScreen() {
 
 private object Routes {
     const val MAIN = "main"
+    const val SEED_MODE = "seed_mode"
     const val PEER_UUID_ARG = "peerUuid"
     const val CHAT_PATTERN = "chat/{$PEER_UUID_ARG}"
     const val GROUP_ID_ARG = "groupId"

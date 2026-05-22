@@ -46,7 +46,10 @@ import com.ospchat.android.ui.avatar.Avatar
 import com.ospchat.android.ui.avatar.AvatarModel
 
 @Composable
-fun AboutScreen(viewModel: AboutViewModel = hiltViewModel()) {
+fun AboutScreen(
+    onSeedModeClick: () -> Unit,
+    viewModel: AboutViewModel = hiltViewModel(),
+) {
     val context = LocalContext.current
     val currentNickname by viewModel.nickname.collectAsStateWithLifecycle()
     val selfAvatar by viewModel.selfAvatar.collectAsStateWithLifecycle()
@@ -151,6 +154,10 @@ fun AboutScreen(viewModel: AboutViewModel = hiltViewModel()) {
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+        Button(onClick = onSeedModeClick) {
+            Text(stringResource(R.string.about_seed_mode))
+        }
 
         Button(
             onClick = { showExitConfirm = true },
