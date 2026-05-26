@@ -28,12 +28,15 @@ import com.ospchat.shared.data.groups.GroupSyncer
 import com.ospchat.shared.data.identity.IdentityRepository
 import com.ospchat.shared.data.messages.MessageDao
 import com.ospchat.shared.data.messages.MessageRepository
+import com.ospchat.shared.data.peers.GossipedPeerStore
 import com.ospchat.shared.data.peers.PeerAvatarSync
 import com.ospchat.shared.data.peers.PeerDao
 import com.ospchat.shared.data.peers.PeerHistoryDao
 import com.ospchat.shared.data.peers.PeerHistoryRecorder
 import com.ospchat.shared.data.peers.PeerInfoNotifier
 import com.ospchat.shared.data.peers.PeerRepository
+import com.ospchat.shared.data.peers.PeerRouter
+import com.ospchat.shared.data.peers.RelayBridgeRegistry
 import com.ospchat.shared.data.reactions.ReactionDao
 import com.ospchat.shared.data.reactions.ReactionRepository
 import com.ospchat.shared.domain.contacts.AddToContactsUseCase
@@ -125,7 +128,18 @@ object SharedModule {
     fun provideMessageClient(
         http: HttpClient,
         discoveryRepository: DiscoveryRepository,
-    ): MessageClient = MessageClient(http = http, discoveryRepository = discoveryRepository)
+        identityRepository: IdentityRepository,
+    ): MessageClient =
+        MessageClient(
+            http = http,
+            discoveryRepository = discoveryRepository,
+            // Phase 2b: outbound DTOs get signed once the keypair has been
+            // loaded by DiscoveryForegroundService's ensureSigningKeyPair
+            // call at startup. Pre-startup sends would be unsigned, but
+            // there shouldn't be any (the UI doesn't function until the
+            // service has started).
+            signingKeyProvider = { identityRepository.signingKeyPairOrNull() },
+        )
 
     // ---- Misc shared --------------------------------------------------------
 
@@ -147,6 +161,9 @@ object SharedModule {
         historyDao: PeerHistoryDao,
         historyRecorder: PeerHistoryRecorder,
         discoveryRepository: DiscoveryRepository,
+        peerRouter: PeerRouter,
+        gossipedPeerStore: GossipedPeerStore,
+        relayBridgeRegistry: RelayBridgeRegistry,
     ): PeerRepository =
         PeerRepository(
             peerDao = peerDao,
@@ -154,6 +171,11 @@ object SharedModule {
             historyDao = historyDao,
             historyRecorder = historyRecorder,
             discoveryRepository = discoveryRepository,
+            // Phase 4: lets toRecord compute "via <bridge-nickname>" and
+            // mark peers offline when the bridge route disappears.
+            peerRouter = peerRouter,
+            gossipedPeerStore = gossipedPeerStore,
+            relayBridgeRegistry = relayBridgeRegistry,
         )
 
     @Provides
@@ -163,12 +185,49 @@ object SharedModule {
         peerDao: PeerDao,
         avatarStore: AvatarStore,
         avatarBounds: ImageBounds,
+        gossipedPeerStore: GossipedPeerStore,
+        relayBridgeRegistry: RelayBridgeRegistry,
+        identityRepository: IdentityRepository,
     ): PeerAvatarSync =
         PeerAvatarSync(
             client = client,
             peerDao = peerDao,
             avatarStore = avatarStore,
             avatarBounds = avatarBounds,
+            gossipedPeerStore = gossipedPeerStore,
+            relayBridgeRegistry = relayBridgeRegistry,
+            // Phase 4 defence: filter self.uuid out of every inbound
+            // gossip list before it enters GossipedPeerStore.
+            identityRepository = identityRepository,
+        )
+
+    // ---- Phase 4 multi-network bridging -------------------------------------
+
+    @Provides @Singleton fun provideGossipedPeerStore(): GossipedPeerStore = GossipedPeerStore()
+
+    @Provides @Singleton fun provideRelayBridgeRegistry(): RelayBridgeRegistry = RelayBridgeRegistry()
+
+    // ---- Phase 3 multi-network bridging -------------------------------------
+    //
+    // Embedded TURN server for voice-call ICE relay. DiscoveryForegroundService
+    // owns the start/stop lifecycle (tied to the existing phase-4 relayEnabled
+    // flag — one toggle gates both message-relay forwarding and voice TURN).
+    // PR 2 wires the TurnCredentialService surface into /v1/call/relay-cred.
+
+    @Provides @Singleton fun provideOspChatTurnServer(): com.ospchat.shared.turn.OspChatTurnServer =
+        com.ospchat.shared.turn.OspChatTurnServer()
+
+    @Provides
+    @Singleton
+    fun providePeerRouter(
+        discoveryRepository: DiscoveryRepository,
+        gossipedPeerStore: GossipedPeerStore,
+        relayBridgeRegistry: RelayBridgeRegistry,
+    ): PeerRouter =
+        PeerRouter(
+            discoveryRepository = discoveryRepository,
+            gossipedPeerStore = gossipedPeerStore,
+            relayBridgeRegistry = relayBridgeRegistry,
         )
 
     @Provides
@@ -210,6 +269,8 @@ object SharedModule {
         attachmentStore: AttachmentStore,
         attachmentCompressor: ImageCompressor,
         attachmentBounds: ImageBounds,
+        peerRouter: PeerRouter,
+        gossipedPeerStore: GossipedPeerStore,
     ): MessageRepository =
         MessageRepository(
             messageDao = messageDao,
@@ -220,6 +281,8 @@ object SharedModule {
             attachmentStore = attachmentStore,
             attachmentCompressor = attachmentCompressor,
             attachmentBounds = attachmentBounds,
+            peerRouter = peerRouter,
+            gossipedPeerStore = gossipedPeerStore,
         )
 
     // ---- Group repositories -------------------------------------------------
@@ -360,6 +423,8 @@ object SharedModule {
         sessionFactory: AudioCallSessionFactory,
         notifier: SharedCallNotifier,
         peerDao: PeerDao,
+        relayBridgeRegistry: RelayBridgeRegistry,
+        peerRouter: PeerRouter,
     ): CallRepository =
         CallRepository(
             dao = callDao,
@@ -369,6 +434,13 @@ object SharedModule {
             sessionFactory = sessionFactory,
             notifier = notifier,
             peerDao = peerDao,
+            // Phase 3 multi-network bridging: speculative TURN cred prefetch
+            // before sessionFactory.create on every outbound/inbound call.
+            relayBridgeRegistry = relayBridgeRegistry,
+            // Phase 5 multi-network bridging: outbound call signaling DTOs
+            // route via PeerRouter — direct when target is in discovery,
+            // bridged with `toUuid` set when target is only in gossip.
+            peerRouter = peerRouter,
         )
 
     // ---- Embedded HTTP server ------------------------------------------------
@@ -388,6 +460,10 @@ object SharedModule {
         groupRepository: GroupRepository,
         groupSyncer: GroupSyncer,
         callRepository: CallRepository,
+        client: MessageClient,
+        gossipedPeerStore: GossipedPeerStore,
+        peerDao: PeerDao,
+        turnServer: com.ospchat.shared.turn.OspChatTurnServer,
     ): MessageServer =
         MessageServer(
             discoveryRepository = discoveryRepository,
@@ -402,6 +478,13 @@ object SharedModule {
             groupRepository = groupRepository,
             groupSyncer = groupSyncer,
             callRepository = callRepository,
+            messageClient = client,
+            gossipedPeerStore = gossipedPeerStore,
+            peerDao = peerDao,
+            // Phase 3: backs POST /v1/call/relay-cred when this node is a
+            // bridge. Same OspChatTurnServer instance that's already started
+            // and stopped by DiscoveryForegroundService.
+            turnCredentialService = turnServer,
         )
 }
 

@@ -58,6 +58,12 @@ android {
                 "/META-INF/{AL2.0,LGPL2.1}",
                 "/META-INF/INDEX.LIST",
                 "/META-INF/io.netty.versions.properties",
+                // BouncyCastle (bcprov-jdk18on, added by ospchat-shared 0.2.8
+                // for Ed25519) ships an OSGi manifest under a JDK 9
+                // multi-release path that collides with another jar's copy
+                // during APK packaging. Android doesn't use OSGi, so the
+                // safe move is to drop it. Phase 2a multi-network bridging.
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
             )
     }
 }

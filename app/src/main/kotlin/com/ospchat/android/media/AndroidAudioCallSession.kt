@@ -3,6 +3,7 @@ package com.ospchat.android.media
 import android.content.Context
 import com.ospchat.shared.media.AudioCallSession
 import com.ospchat.shared.media.AudioCallSessionFactory
+import com.ospchat.shared.turn.IceServerConfig
 import com.ospchat.shared.util.Log
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +42,7 @@ import kotlin.coroutines.resumeWithException
  */
 class AndroidAudioCallSession(
     factory: PeerConnectionFactory,
+    iceServers: List<IceServerConfig> = emptyList(),
 ) : AudioCallSession {
     private val _state = MutableStateFlow(AudioCallSession.State.NEW)
     override val state: StateFlow<AudioCallSession.State> = _state.asStateFlow()
@@ -74,7 +76,18 @@ class AndroidAudioCallSession(
     private val peer: PeerConnection =
         requireNotNull(
             factory.createPeerConnection(
-                PeerConnection.RTCConfiguration(emptyList()),
+                // Phase 3 multi-network bridging — pass through any TURN
+                // entries from the relay bridge. Empty list preserves the
+                // original LAN-only host-candidates-only behaviour.
+                PeerConnection.RTCConfiguration(
+                    iceServers.map { cfg ->
+                        PeerConnection.IceServer
+                            .builder(cfg.uri)
+                            .setUsername(cfg.username)
+                            .setPassword(cfg.credential)
+                            .createIceServer()
+                    },
+                ),
                 object : PeerConnection.Observer {
                     override fun onIceCandidate(candidate: IceCandidate) {
                         iceFlow.tryEmit(
@@ -236,7 +249,8 @@ class AndroidAudioCallSessionFactory
             PeerConnectionFactory.builder().createPeerConnectionFactory()
         }
 
-        override fun create(): AudioCallSession = AndroidAudioCallSession(factory)
+        override fun create(iceServers: List<IceServerConfig>): AudioCallSession =
+            AndroidAudioCallSession(factory, iceServers)
 
         fun shutdown() {
             runCatching { factory.dispose() }

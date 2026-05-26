@@ -202,7 +202,7 @@ internal fun ContactPickerRow(
         Column {
             Text(text = contact.nickname, style = MaterialTheme.typography.bodyMedium)
             Text(
-                text = if (contact.isOnline) "${contact.host}:${contact.port}" else "offline",
+                text = if (contact.isOnline) contact.displayAddress() else "offline",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -23,6 +23,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,6 +54,7 @@ fun AboutScreen(
     val context = LocalContext.current
     val currentNickname by viewModel.nickname.collectAsStateWithLifecycle()
     val selfAvatar by viewModel.selfAvatar.collectAsStateWithLifecycle()
+    val relayEnabled by viewModel.relayEnabled.collectAsStateWithLifecycle()
     var editedNickname by remember(currentNickname) { mutableStateOf(currentNickname.orEmpty()) }
     val keyboard = LocalSoftwareKeyboardController.current
     var showExitConfirm by remember { mutableStateOf(false) }
@@ -151,6 +153,36 @@ fun AboutScreen(
             enabled = canSave,
         ) {
             Text(stringResource(R.string.about_nickname_save))
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+        // Phase 4 multi-network bridging — relay opt-in. Enable when this
+        // phone sits on a network that other peers can reach but their
+        // intended targets cannot. Most users leave this off; the typical
+        // bridge is a desktop on multiple LANs.
+        Text(
+            text = "Relay for contacts (messages + voice)",
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Text(
+            text =
+                "Forward signed messages and serve as a TURN relay for voice calls " +
+                    "between peers that can't reach each other directly. Messages and " +
+                    "voice both stay end-to-end encrypted: the relay sees encrypted " +
+                    "envelopes / SRTP datagrams only. Takes effect on next restart.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Switch(checked = relayEnabled, onCheckedChange = { viewModel.setRelayEnabled(it) })
+            Text(
+                text = if (relayEnabled) "Relay enabled" else "Relay disabled",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))

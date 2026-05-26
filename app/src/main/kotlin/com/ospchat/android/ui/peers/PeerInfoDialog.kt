@@ -35,11 +35,14 @@ fun PeerInfoDialog(
     info: PeerInfo,
     onDismiss: () -> Unit,
 ) {
-    val currentAddress = "${info.record.host}:${info.record.port}"
+    val currentAddress = info.record.displayAddress()
     val previousAddresses =
         info.addresses
             .map { "${it.host}:${it.port}" }
-            .filter { it != currentAddress }
+            // Drop the "via bridge" sentinel — historical addresses
+            // table only carries real host:port pairs from prior direct
+            // sightings.
+            .filterNot { it == ":0" || it == currentAddress }
     val previousNicknames =
         info.nicknames
             .map { it.nickname }

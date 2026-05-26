@@ -123,7 +123,7 @@ fun GroupsScreen(
                     MembershipCandidate(
                         uuid = it.uuid,
                         nickname = it.nickname,
-                        subtitle = if (it.isOnline) "${it.host}:${it.port}" else "offline",
+                        subtitle = if (it.isOnline) it.displayAddress() else "offline",
                     )
                 }
         MembershipPickerSheet(

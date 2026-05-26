@@ -186,7 +186,7 @@ internal fun PeerRow(
                 Text(
                     text =
                         if (peer.isOnline) {
-                            "${peer.host}:${peer.port}"
+                            peer.displayAddress()
                         } else {
                             stringResource(R.string.peers_offline)
                         },

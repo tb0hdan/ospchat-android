@@ -113,6 +113,138 @@ ospchat-android/
 
 ## Current Status
 
+- 2026-05-26 — **unreleased**: **Phase 5 multi-network bridging (PR 3:
+  relayed call signaling).** A1→D→A2 smoke test surfaced that PR 2's
+  TURN media relay alone couldn't bridge cross-network calls because
+  the SDP signaling DTOs (`/v1/call/{offer,answer,ice,hangup}`) had no
+  bridging fields and went peer-to-peer. PR 3 extends the same
+  `toUuid` / `via` / `hopTtl` pattern phase 4 uses for message DTOs to
+  the call DTOs. `CallRepository` resolves a route via `PeerRouter`
+  before creating the session, stamps `toUuid` on outbound offer /
+  answer / ICE / hangup DTOs, and routes replies through the same
+  bridge that delivered the offer. Hilt `provideCallRepository` adds
+  the `peerRouter` injection. No new permissions or manifest changes.
+  OpenAPI bumped to 0.14.0 in shared. **Next smoke test** is the
+  re-run of A1→D→A2 with all four PR 1 / 1.5 / 2 / 3 deltas applied.
+- 2026-05-26 — **unreleased**: **Phase 3 multi-network bridging
+  (PR 1.5 + PR 2: consumer wiring + wire protocol).** Hilt
+  `SharedModule.provideOspChatTurnServer` provides the singleton;
+  `DiscoveryForegroundService` starts/stops it tied to the
+  `relayEnabled` flag and the foreground service lifecycle. Hilt
+  `provideCallRepository` adds the `relayBridgeRegistry` plumbing for
+  TURN cred prefetch; Hilt `provideMessageServer` adds
+  `turnCredentialService = turnServer` so `/v1/call/relay-cred` can
+  issue creds. `AndroidAudioCallSession(factory, iceServers)` —
+  `PeerConnection.RTCConfiguration` populated with TURN entries when
+  present. About-screen toggle copy updated to "Relay for contacts
+  (messages + voice)". Wire-protocol changes (signed call DTOs,
+  `/v1/call/relay-cred`, new error codes, OpenAPI 0.13.0) all in
+  shared. **Phase 3 complete end-to-end.** Smoke test against a desktop
+  acting as TURN bridge is the natural next step.
+- 2026-05-26 — **unreleased**: **Phase 3 multi-network bridging
+  (PR 1: shared TURN foundation).** Pure-Kotlin RFC 5766 subset
+  added to `ospchat-shared` under `com.ospchat.shared.turn.*`
+  (STUN/TURN codec, allocation state machine, pure handlers,
+  `OspChatTurnServer` wrapping `java.net.DatagramSocket`). Android
+  consumes the same actual implementation (duplicated identically
+  in `desktopMain` + `androidMain` per the `bouncycastle` pattern,
+  no intermediate `jvmMain`). 33 unit tests pass in commonTest.
+  Existing `relayEnabled` flag from phase 4 will gate both message-
+  DTO forwarding (phase 4) and TURN voice relay (phase 3) — one
+  toggle, two purposes. PR 1.5 (consumer wiring) will: (1)
+  `SharedModule` provide `OspChatTurnServer` as a Hilt
+  `@Singleton`; (2) `DiscoveryForegroundService.onStartCommand`
+  call `turnServer.start()` when `relayEnabled=true`, and
+  `onDestroy` call `stop()`; (3) About-screen toggle label updated
+  in PR 2 to read "messages + voice". No new Android permissions
+  needed — the TURN listener uses the existing INTERNET
+  permission inside the already-declared `connectedDevice`
+  foreground service. PR 2 (deferred) adds `/v1/call/relay-cred`,
+  signed call DTOs, and `iceServers` threading into
+  `AndroidAudioCallSession`.
+- 2026-05-25 — **unreleased**: **Phase 4 consumer-side shared
+  foundation.** `ospchat-shared` gained `PeerRouter`,
+  `RelayBridgeRegistry`, gossip-pubkey lookup in `MessageRoutes`, and
+  `MessageRepository.sendToUuid` + auto-record-gossip-sender on
+  `receive`. Android-side wiring still pending: Hilt provider for
+  `GossipedPeerStore` / `RelayBridgeRegistry` / `PeerRouter`; pass
+  them into `PeerAvatarSync`, `MessageRepository`, and the
+  `MessageRoutes` install; add a Settings toggle for the relay
+  opt-in; surface gossiped peers in the contact list so the user can
+  initiate a cross-LAN DM.
+- 2026-05-25 — **unreleased**: **Phase 4 multi-network bridging
+  (server-side foundation).** Wire format for message-level relay
+  through multi-homed peers shipped in `ospchat-shared`. Seven signed
+  DTOs gained nullable `toUuid` (signed) + `via` + `hopTtl`
+  (unsigned). `/v1/info` gossips peers + advertises `relayEnabled`.
+  `MessageRoutes` forwards when `toUuid != self`. New
+  `GossipedPeerStore` populated by `PeerAvatarSync`.
+  `IdentityRepository.relayEnabledFlow` for the opt-in toggle.
+  Consumer-side wiring still pending — Android needs (a) the relay
+  opt-in UI surface in Settings, (b) outbound MessageClient changes
+  to consult `GossipedPeerStore` and route through a bridge when the
+  target isn't directly discovered. OpenAPI 0.12.0;
+  `docs/SECURITY.md` F10 documents the relay trust model.
+- 2026-05-25 — **unreleased**: **Phase 2b consumer wiring verified
+  (desktop side).** Linups desktop log shows
+  `pk=<16-chars> persistedPins=1` at startup — phase 2a pubkey
+  populated AND the persistent TOFU pin map loaded from Room before
+  discovery started. Android-side will exercise the same path once
+  rebuilt against `ospchat-shared:0.2.8` (consumer wiring landed in
+  `DiscoveryForegroundService`).
+- 2026-05-25 — **unreleased**: **Phase 2b multi-network bridging**
+  (signed DTOs + persistent pubkey pinning) shipped in
+  `ospchat-shared`. Seven DTOs (`IncomingMessageDto`, `ReadReceiptDto`,
+  `ReactionDto`, `GroupSnapshotDto`, `GroupMessageDto`,
+  `GroupSyncRequestDto`, `GroupLeaveDto`) gained nullable
+  `signedAt` / `signature` fields with per-DTO canonical payload via
+  `SignaturePayloadBuilder`. `MessageClient` signs outbound;
+  `MessageRoutes` verifies inbound with a ±5-minute replay window.
+  Persistent pubkey pinning: Room migration v10 → v11 adds the
+  `peers.pub_key` column; `DiscoveryRepository.preloadPinnedPubkeys()`
+  warms the discovery service at startup so F9 protection survives a
+  restart. `DiscoveryForegroundService` now `@Inject`s `PeerDao` and
+  calls `loadPinnedPubkeys()` → `preloadPinnedPubkeys(...)` →
+  `start(...)` in order; startup log includes
+  `persistedPins=<count>` for runtime verification.
+  Tolerate-unsigned rollout mode;
+  flip to strict in a follow-up release. `docs/SECURITY.md` F9 marked
+  **FULLY MITIGATED**. OpenAPI bumped to 0.11.0.
+- 2026-05-25 — **unreleased**: **Phase 1 + 2a verified on real LAN.**
+  After consumers picked up `ospchat-shared:0.2.8` (via mavenLocal),
+  bidirectional voice calls Android ↔ Desktop and 1:1 text chat both
+  work end-to-end. The "Android cannot see desktop" regression caused
+  by the legacy single-interface JmDNS bind is resolved. No F9
+  pkh-mismatch false positives — every legitimate peer presents one
+  pubkey across all its addresses, so the multi-NIC merge path stays
+  green. Android-side wiring is in `DiscoveryForegroundService`:
+  `identityRepository.ensureSigningKeyPair()` → b64 →
+  `messageServer.start(..., publicKeyB64=...)` and
+  `discoveryRepository.start(..., publicKeyB64=...)`.
+- 2026-05-25 — **unreleased**: **Phase 2a multi-network bridging**
+  (identity infrastructure) landed in `ospchat-shared`. Per-install
+  Ed25519 keypair (`IdentityRepository.ensureSigningKeyPair`, BC-backed
+  via the new `SigningCrypto` expect/actual). Pubkey advertised via
+  the `pk=<b64>` mDNS TXT attribute and `GET /v1/info`. F9 hijack
+  rejection restored in `protectedInsert` via TOFU pubkey pinning
+  (in-memory; phase 2b will persist). Android-side change is the
+  `NsdPeerDiscovery.start` signature gaining `publicKeyB64: String?`
+  and `handleResolved` reading `pk=` from the TXT attributes. No DTO
+  signatures yet (phase 2b). See `docs/SECURITY.md` F9.
+- 2026-05-25 — **unreleased**: **Phase 1 multi-network bridging**
+  shipped in `ospchat-shared` (see "Suggested Next Steps" item 6 and
+  `ospchat-desktop/docs/PROJECT_NOTES.md` item 7 for the four-phase
+  plan). Android-side change is in `NsdPeerDiscovery.handleResolved`:
+  feeds an `Endpoint` into the new candidate-merging `protectedInsert`
+  instead of constructing a `Peer` directly. `Peer` now carries
+  `List<Endpoint>` candidates sorted by RFC1918 > CGNAT > public.
+  `MessageClient` walks candidates on TCP-level failures before
+  `forgetPeer`-and-retry; `MessageRoutes` source-IP trust matches
+  against any candidate. F9 hijack rejection is relaxed pending
+  phase 2 (signed advertisements) — see `docs/SECURITY.md` F9. No
+  wire / OpenAPI change. Android `NsdManager` enumerates its own
+  interfaces, so the desktop's per-interface JmDNS work doesn't
+  apply here.
 - 2026-05-22 — **unreleased**: Seed Mode "Serving at" line folded
   into the Wi-Fi hotspot status. The separate monospace
   `Serving at <url>` label above the QR is gone; the hotspot line
@@ -490,7 +622,13 @@ ospchat-android/
   See `README.md`.
 - On API 26–33 some Wi-Fi networks restrict mDNS multicast; the multicast lock
   acquired by the foreground service is the standard mitigation.
-- Discovery is single-network. Hotspot / dual-Wi-Fi scenarios are untested.
+- Discovery is single-network *on Android* — `NsdManager` chooses the
+  interface set, not us. Hotspot / dual-Wi-Fi scenarios are untested.
+  As of phase 1 multi-network bridging, the shared `Peer` model can
+  hold multiple `(host, port)` candidates per UUID and the send
+  pipeline tries each, so a peer that Android happens to resolve at
+  two addresses is now fully reachable — but Android still surfaces
+  whatever the framework decides to surface.
 - No tests yet — adding a unit-test smoke covering `NsdPeerDiscovery` peer
   bookkeeping is the suggested next step.
 - CI (`.github/workflows/ci.yml`) runs `make ktlint` + `make build` on
@@ -506,3 +644,32 @@ ospchat-android/
    offline when an edit is issued).
 4. Migration tests for the Room schema (`MigrationTestHelper`).
 5. Unit-test smoke covering `NsdPeerDiscovery` peer bookkeeping.
+6. **Multi-network bridging — phased plan.** Four phases, each
+   independently shippable; full description in
+   `ospchat-desktop/docs/PROJECT_NOTES.md` "Suggested next steps"
+   item 7. Android-side notes:
+   - **Phase 1 — Multi-NIC + candidate-list peer model.** The
+     desktop-side per-interface `JmDNS` work doesn't apply on
+     Android — `NsdManager` enumerates interfaces itself — but the
+     candidate-list refactor of `PeerDiscoveryService.Peer` /
+     `protectedInsert` lives in `ospchat-shared` and applies to both
+     clients. Android-specific change is in
+     `NsdPeerDiscovery.handleResolved`: feed an `Endpoint` into the
+     merged `protectedInsert` instead of constructing a `Peer`
+     directly. F9 hijack rejection is relaxed in this phase
+     (see `docs/SECURITY.md` F9) pending phase 2.
+   - **Phase 2 — Signed peer advertisements / signed messages.**
+     Per-install Ed25519 keypair + signed message DTOs. Restores F9
+     properly.
+   - **Phase 3 — TURN-as-ICE-relay for voice.** Opt-in per-node TURN
+     server; uses libwebrtc's existing ICE-relay primitive.
+   - **Phase 4 — `via` relay for text / group messages.** Requires
+     phase 2; intermediate nodes forward by uuid hop list. ZeroTier
+     does **not** apply on Android (`VpnService` strips
+     multicast/broadcast), so the rendezvous-relay path is the only
+     viable cross-network discovery option here.
+
+   Updates the existing Known Limitation "Discovery is single-network.
+   Hotspot / dual-Wi-Fi scenarios are untested." once phase 1 lands.
+   Updates the `Out of scope` line ("Internet / WAN peer discovery")
+   once phases 2 + 4 land.

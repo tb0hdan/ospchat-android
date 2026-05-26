@@ -113,7 +113,20 @@ class ChatViewModel
                             context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         }.getOrNull()
                     }
-                messageRepository.send(target.toPeer(), trimmed, attachmentBytes)
+                // Phase 4 multi-network bridging: a phantom peer (host == "")
+                // is a target we know only via gossip from a bridge — route
+                // through the bridge via sendToUuid. Direct peers keep the
+                // existing send(peer, body, bytes) path.
+                val peer = target.toPeer()
+                if (peer.host.isEmpty()) {
+                    messageRepository.sendToUuid(
+                        targetUuid = peer.uuid,
+                        body = trimmed,
+                        attachmentBytes = attachmentBytes,
+                    )
+                } else {
+                    messageRepository.send(peer, trimmed, attachmentBytes)
+                }
                 _draftAttachment.value = null
             }
         }

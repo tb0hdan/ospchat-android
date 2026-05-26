@@ -79,6 +79,21 @@ class AboutViewModel
             }
         }
 
+        /**
+         * Phase 4 multi-network bridging — observable relay opt-in. The
+         * About screen shows a Switch bound to this flow. Setting flips
+         * the persisted flag; takes effect on next process restart.
+         */
+        val relayEnabled: StateFlow<Boolean> =
+            identityRepository.relayEnabledFlow
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        fun setRelayEnabled(enabled: Boolean) {
+            viewModelScope.launch {
+                identityRepository.setRelayEnabled(enabled)
+            }
+        }
+
         private suspend fun bounceService() {
             DiscoveryForegroundService.stop(context)
             delay(SERVICE_RESTART_DELAY_MS)
